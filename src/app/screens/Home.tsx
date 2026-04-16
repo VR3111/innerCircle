@@ -4,22 +4,17 @@ import { useNotifications } from "../contexts/NotificationsContext";
 import AgentDots from "../components/AgentDots";
 import PostCard from "../components/PostCard";
 import BottomNav from "../components/BottomNav";
-import { posts, getAgentById } from "../data/mockData";
+import { usePosts } from "../hooks/usePosts";
 
 export default function Home() {
   const navigate = useNavigate();
   const { unreadCount } = useNotifications();
+  const { posts, loading, error } = usePosts();
 
   const handleAgentClick = (agentId: string) => {
-    if (agentId === "all") return; // already on /home
+    if (agentId === "all") return;
     navigate(`/feed/${agentId}`);
   };
-
-  const firstPost = posts[0];
-  const secondPost = posts[1];
-  const firstAgent = getAgentById(firstPost.agentId);
-
-  if (!firstAgent) return null;
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] pb-20 md:pb-0">
@@ -41,27 +36,33 @@ export default function Home() {
         <AgentDots activeAgent="all" onAgentClick={handleAgentClick} />
       </div>
 
-      {/* MOBILE FEED — 2-post preview layout */}
-      <div className="md:hidden max-w-[375px] mx-auto pt-4">
-        <div className="px-4 mb-4">
-          <PostCard post={firstPost} agent={firstAgent} />
-        </div>
-        {secondPost && (
-          <div className="px-4 opacity-60">
-            <PostCard post={secondPost} agent={getAgentById(secondPost.agentId)!} />
+      {/* Feed — shared across mobile and desktop center column */}
+      <div className="max-w-[520px] mx-auto px-4 pt-4 pb-4 md:py-8 md:px-6">
+        {loading && (
+          <div className="flex justify-center py-24">
+            <div className="w-6 h-6 border-2 border-white/15 border-t-white/60 rounded-full animate-spin" />
           </div>
         )}
-      </div>
 
-      {/* DESKTOP FEED — full scrollable feed, capped at 520px, centered */}
-      <div className="hidden md:block max-w-[520px] mx-auto py-8 px-6">
-        <div className="flex flex-col gap-5">
-          {posts.map((post) => {
-            const agent = getAgentById(post.agentId);
-            if (!agent) return null;
-            return <PostCard key={post.id} post={post} agent={agent} />;
-          })}
-        </div>
+        {!loading && error && (
+          <div className="text-center py-24 text-white/30 font-['DM_Sans'] text-sm">
+            Failed to load posts
+          </div>
+        )}
+
+        {!loading && !error && posts.length === 0 && (
+          <div className="text-center py-24 text-white/30 font-['DM_Sans'] text-sm">
+            No posts yet
+          </div>
+        )}
+
+        {!loading && !error && posts.length > 0 && (
+          <div className="flex flex-col gap-5">
+            {posts.map(({ post, agent }) => (
+              <PostCard key={post.id} post={post} agent={agent} />
+            ))}
+          </div>
+        )}
       </div>
 
       <BottomNav />
