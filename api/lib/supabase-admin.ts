@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../../src/lib/database.types'
 
 // Server-side only — uses the service role key which bypasses RLS.
@@ -8,7 +9,7 @@ import type { Database } from '../../src/lib/database.types'
 // a missing variable produces a clear error message rather than a cold-start
 // module failure that shows up as FUNCTION_INVOCATION_FAILED with no context.
 
-let _client: ReturnType<typeof createClient<Database>> | null = null
+let _client: SupabaseClient<Database> | null = null
 
 export function getSupabaseAdmin() {
   if (_client) return _client

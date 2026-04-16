@@ -90,6 +90,7 @@ async function runAgent(config: AgentConfig): Promise<AgentResult> {
 // ── Vercel serverless handler ─────────────────────────────────────────────────
 
 export default async function handler(req: any, res: any) {
+  console.log('Handler started')
   try {
     // Verify caller is Vercel Cron or an authorized manual trigger
     const auth           = (req.headers['authorization'] ?? '') as string
