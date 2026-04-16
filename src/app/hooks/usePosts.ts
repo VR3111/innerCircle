@@ -30,47 +30,66 @@ export function usePosts(agentId?: string) {
       setLoading(true)
       setError(null)
 
-      let query = supabase
-        .from('posts')
-        .select('*')
-        .order('created_at', { ascending: false })
+      try {
+        console.log('[usePosts] fetching posts…', { agentId: agentId ?? 'all' })
 
-      if (agentId) {
-        query = query.eq('agent_id', agentId)
-      }
+        // Build query inline to avoid the type-reassignment issue with the
+        // Supabase builder — each chain step returns a new typed object.
+        const { data, error: err } = await (
+          agentId
+            ? supabase
+                .from('posts')
+                .select('*')
+                .eq('agent_id', agentId)
+                .order('created_at', { ascending: false })
+            : supabase
+                .from('posts')
+                .select('*')
+                .order('created_at', { ascending: false })
+        )
 
-      const { data, error: err } = await query
+        if (cancelled) return
 
-      if (cancelled) return
+        console.log('[usePosts] result:', { count: data?.length ?? 0, err })
 
-      if (err) {
-        setError(err.message)
-        setLoading(false)
-        return
-      }
-
-      // Map DB rows to the Post shape PostCard already understands
-      const mapped: PostWithAgent[] = (data ?? []).flatMap(row => {
-        const agent = agents.find(a => a.id === row.agent_id)
-        if (!agent) return []
-
-        const post: Post = {
-          id:        row.id,
-          agentId:   row.agent_id,
-          headline:  row.headline,
-          caption:   row.body,
-          image:     row.image_url ?? '',
-          reactions: row.likes,
-          replies:   row.comments,
-          shares:    row.shares,
-          timestamp: timeAgo(row.created_at),
+        if (err) {
+          console.error('[usePosts] Supabase error:', err.message, err.code)
+          setError(err.message)
+          setLoading(false)
+          return
         }
 
-        return [{ post, agent }]
-      })
+        // Map DB rows → Post shape that PostCard already understands.
+        // Rows whose agent_id doesn't match a known agent are silently skipped.
+        const mapped: PostWithAgent[] = (data ?? []).flatMap(row => {
+          const agent = agents.find(a => a.id === row.agent_id)
+          if (!agent) return []
 
-      setPosts(mapped)
-      setLoading(false)
+          const post: Post = {
+            id:        row.id,
+            agentId:   row.agent_id,
+            headline:  row.headline,
+            caption:   row.body,
+            image:     row.image_url ?? '',
+            reactions: row.likes,
+            replies:   row.comments,
+            shares:    row.shares,
+            timestamp: timeAgo(row.created_at),
+          }
+
+          return [{ post, agent }]
+        })
+
+        console.log('[usePosts] mapped posts:', mapped.length)
+        setPosts(mapped)
+        setLoading(false)
+
+      } catch (err: any) {
+        if (cancelled) return
+        console.error('[usePosts] unexpected error:', err?.message ?? err)
+        setError(err?.message ?? 'Failed to load posts')
+        setLoading(false)
+      }
     }
 
     load()

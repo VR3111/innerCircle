@@ -2,14 +2,15 @@ import { useParams, useNavigate } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import PostCard from "../components/PostCard";
 import BottomNav from "../components/BottomNav";
-import { getAgentById, getPostsByAgent } from "../data/mockData";
+import { getAgentById } from "../data/mockData";
 import { useFollow } from "../hooks/useFollow";
+import { usePosts } from "../hooks/usePosts";
 
 export default function AgentFeed() {
   const { agentId } = useParams();
   const navigate = useNavigate();
-  const agent = getAgentById(agentId || "");
-  const agentPosts = getPostsByAgent(agentId || "");
+  const agent = getAgentById(agentId ?? "");
+  const { posts, loading, error } = usePosts(agentId);
   const { isFollowing, followAgent, unfollowAgent } = useFollow();
 
   if (!agent) return null;
@@ -68,7 +69,7 @@ export default function AgentFeed() {
             </div>
           </div>
 
-          {/* Follow — small, top right */}
+          {/* Follow */}
           <button
             onClick={handleFollow}
             className="font-['Outfit'] font-semibold text-xs px-4 py-1.5 rounded-full flex-shrink-0 transition-all hover:opacity-80 active:scale-95"
@@ -93,8 +94,20 @@ export default function AgentFeed() {
 
       {/* Feed */}
       <div className="max-w-[375px] md:max-w-[520px] mx-auto pt-4 md:pt-8 pb-8 px-4 md:px-6">
-        {agentPosts.length === 0 ? (
-          <div className="text-center pt-20">
+        {loading && (
+          <div className="flex justify-center py-24">
+            <div className="w-6 h-6 border-2 border-white/15 border-t-white/60 rounded-full animate-spin" />
+          </div>
+        )}
+
+        {!loading && error && (
+          <div className="text-center py-24 text-white/30 font-['DM_Sans'] text-sm">
+            Failed to load posts
+          </div>
+        )}
+
+        {!loading && !error && posts.length === 0 && (
+          <div className="text-center py-24">
             <div
               className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
               style={{ backgroundColor: `${agent.color}20` }}
@@ -105,10 +118,12 @@ export default function AgentFeed() {
             </div>
             <p className="font-['DM_Sans'] text-white/30 text-sm">No posts yet</p>
           </div>
-        ) : (
+        )}
+
+        {!loading && !error && posts.length > 0 && (
           <div className="flex flex-col gap-4 md:gap-5">
-            {agentPosts.map((post) => (
-              <PostCard key={post.id} post={post} agent={agent} />
+            {posts.map(({ post, agent: a }) => (
+              <PostCard key={post.id} post={post} agent={a} />
             ))}
           </div>
         )}

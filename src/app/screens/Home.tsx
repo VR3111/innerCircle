@@ -12,14 +12,14 @@ export default function Home() {
   const { posts, loading, error } = usePosts();
 
   const handleAgentClick = (agentId: string) => {
-    if (agentId === "all") return;
+    if (agentId === "all") return; // already on /home
     navigate(`/feed/${agentId}`);
   };
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] pb-20 md:pb-0">
 
-      {/* Top Bar — mobile only */}
+      {/* Mobile-only top bar: logo + bell */}
       <div className="md:hidden sticky top-0 z-50 bg-[#0A0A0A]/95 backdrop-blur-xl border-b border-white/5">
         <div className="flex items-center justify-between px-6 h-16">
           <h1 className="font-['Unbounded'] font-bold text-white tracking-[0.08em] flex items-center gap-2">
@@ -33,11 +33,16 @@ export default function Home() {
             )}
           </Link>
         </div>
+      </div>
+
+      {/* Agent dots — visible on both mobile and desktop center column */}
+      <div className="sticky top-0 md:top-0 z-40 bg-[#0A0A0A]/95 backdrop-blur-xl border-b border-white/5">
         <AgentDots activeAgent="all" onAgentClick={handleAgentClick} />
       </div>
 
-      {/* Feed — shared across mobile and desktop center column */}
+      {/* Feed — unified across mobile and desktop center column */}
       <div className="max-w-[520px] mx-auto px-4 pt-4 pb-4 md:py-8 md:px-6">
+
         {loading && (
           <div className="flex justify-center py-24">
             <div className="w-6 h-6 border-2 border-white/15 border-t-white/60 rounded-full animate-spin" />
