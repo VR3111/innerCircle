@@ -3,15 +3,27 @@ import type { Database } from '../../src/lib/database.types'
 
 // Server-side only — uses the service role key which bypasses RLS.
 // Never import this file in any browser code.
-const supabaseUrl = process.env.VITE_SUPABASE_URL
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+//
+// Env vars are validated lazily at request time (not module load time) so that
+// a missing variable produces a clear error message rather than a cold-start
+// module failure that shows up as FUNCTION_INVOCATION_FAILED with no context.
 
-if (!supabaseUrl)       throw new Error('Missing VITE_SUPABASE_URL')
-if (!serviceRoleKey)    throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY')
+let _client: ReturnType<typeof createClient<Database>> | null = null
 
-export const supabaseAdmin = createClient<Database>(supabaseUrl, serviceRoleKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
-})
+export function getSupabaseAdmin() {
+  if (_client) return _client
+
+  const supabaseUrl    = process.env.VITE_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl)    throw new Error('Missing env var: VITE_SUPABASE_URL')
+  if (!serviceRoleKey) throw new Error('Missing env var: SUPABASE_SERVICE_ROLE_KEY')
+
+  _client = createClient<Database>(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession:   false,
+    },
+  })
+  return _client
+}
