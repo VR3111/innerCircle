@@ -4,11 +4,6 @@ import type { Database } from './database.types'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 
-// Diagnostic log — visible in browser console and Vercel function logs.
-// Confirms whether env vars are being picked up at build time.
-console.log('[Supabase] VITE_SUPABASE_URL:', supabaseUrl ? 'set' : 'MISSING')
-console.log('[Supabase] VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? 'set' : 'MISSING')
-
 if (!supabaseUrl) {
   console.warn(
     '[Inner Circle] Missing VITE_SUPABASE_URL. ' +
