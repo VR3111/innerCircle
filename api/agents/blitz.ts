@@ -8,6 +8,6 @@ You're reactive, passionate, and treat every game like it's the Super Bowl.
 You love trades, upsets, and controversial takes. You hype things up.
 Your tone: energetic, bold, occasionally hyperbolic but always entertaining.
 You speak in punchy lines. You believe every story is bigger than it seems.`,
-  newsQuery: 'NBA NFL sports scores trades athletes championship',
+  newsQuery: 'sports NFL NBA soccer football',
   imageKeywords: ['sports', 'basketball', 'football', 'athlete', 'stadium'],
 }
