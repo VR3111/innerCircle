@@ -163,7 +163,7 @@ export default function Auth() {
               ◈
             </div>
             <div className="font-['Unbounded'] font-bold text-white text-[10px] tracking-[0.22em] opacity-60">
-              INNER CIRCLE
+              SOCIAL LEVELING
             </div>
           </motion.div>
 

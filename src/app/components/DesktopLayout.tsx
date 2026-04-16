@@ -51,7 +51,7 @@ function DesktopLayoutInner() {
           <div className="flex items-center justify-between px-6 h-[72px] flex-shrink-0">
             <h1 className="font-['Unbounded'] font-bold text-white tracking-[0.08em] flex items-center gap-2.5">
               <span className="text-[#E63946] text-xl">◈</span>
-              <span className="text-[11px]">INNER CIRCLE</span>
+              <span className="text-[11px]">SOCIAL LEVELING</span>
             </h1>
             <Link
               to="/notifications"

@@ -216,22 +216,29 @@ function Step3({
 
   return (
     <div className="h-full flex flex-col items-center justify-center px-8 max-w-[420px] mx-auto select-none">
+
+      {/* Diamond — gold tint + slow ceremonial rotation */}
       <motion.div
         initial={{ scale: 0.5, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.05, type: "spring", stiffness: 200 }}
-        className="font-['Unbounded'] font-bold text-white leading-none mb-8"
-        style={{ fontSize: "clamp(60px, 15vw, 88px)" }}
+        animate={{ scale: 1, opacity: 1, rotate: 360 }}
+        transition={{
+          scale: { delay: 0.05, type: "spring", stiffness: 200, damping: 15 },
+          opacity: { delay: 0.05, duration: 0.4 },
+          rotate: { duration: 20, repeat: Infinity, ease: "linear" },
+        }}
+        className="font-['Unbounded'] font-bold leading-none mb-8"
+        style={{ fontSize: "clamp(60px, 15vw, 88px)", color: "#D4AF37" }}
       >
         ◈
       </motion.div>
 
+      {/* You're in. */}
       <motion.h1
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.12 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.12, duration: 0.6 }}
         className="font-['Unbounded'] font-bold text-white text-center leading-tight mb-4"
-        style={{ fontSize: "clamp(28px, 8vw, 40px)" }}
+        style={{ fontSize: "clamp(48px, 12vw, 64px)", letterSpacing: "2px" }}
       >
         You're in.
       </motion.h1>
@@ -245,7 +252,7 @@ function Step3({
         Your feed is ready. Start climbing the ranks.
       </motion.p>
 
-      {/* Selected agent dots */}
+      {/* Selected agent dots — golden ring on each */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -264,7 +271,8 @@ function Step3({
               className="w-12 h-12 rounded-full flex items-center justify-center"
               style={{
                 backgroundColor: agent.color,
-                boxShadow: `0 0 20px ${agent.color}50`,
+                outline: "1px solid rgba(212,175,55,0.55)",
+                outlineOffset: "3px",
               }}
             >
               <span className="font-['Outfit'] font-bold text-white text-base">
@@ -278,15 +286,63 @@ function Step3({
         ))}
       </motion.div>
 
+      {/* Ceremony separator — ── ◈ ── */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.32, duration: 0.6 }}
+        className="flex items-center gap-3 w-full max-w-[320px] mb-5"
+      >
+        <div style={{ flex: 1, height: "1px", background: "rgba(212,175,55,0.35)" }} />
+        <span
+          className="font-['Unbounded']"
+          style={{ color: "rgba(212,175,55,0.5)", fontSize: "12px", lineHeight: 1 }}
+        >
+          ◈
+        </span>
+        <div style={{ flex: 1, height: "1px", background: "rgba(212,175,55,0.35)" }} />
+      </motion.div>
+
+      {/* Enter Inner Circle — solid gold, shimmer sweep */}
       <motion.button
-        initial={{ opacity: 0, y: 12 }}
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.35 }}
+        transition={{ delay: 0.38, duration: 0.45, type: "spring", stiffness: 260, damping: 24 }}
         onClick={onFinish}
         whileTap={{ scale: 0.97 }}
-        className="w-full max-w-[320px] py-4 rounded-2xl bg-white text-black font-['Outfit'] font-bold text-base tracking-wide hover:bg-white/90 active:scale-[0.98] transition-all"
+        className="w-full max-w-[320px] font-['Outfit'] font-bold"
+        style={{
+          position: "relative",
+          overflow: "hidden",
+          background: "#D4AF37",
+          color: "#000000",
+          height: "60px",
+          borderRadius: "30px",
+          fontSize: "15px",
+          letterSpacing: "0.07em",
+          border: "none",
+        }}
       >
-        Enter Inner Circle
+        {/* Shimmer sweep — light reflecting off gold */}
+        <motion.span
+          aria-hidden
+          style={{
+            position: "absolute",
+            inset: 0,
+            background:
+              "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.38) 50%, transparent 100%)",
+            width: "55%",
+            borderRadius: "30px",
+          }}
+          animate={{ x: ["-100%", "280%"] }}
+          transition={{
+            duration: 1.4,
+            repeat: Infinity,
+            repeatDelay: 2.2,
+            ease: "easeInOut",
+          }}
+        />
+        <span style={{ position: "relative", zIndex: 1 }}>Enter Inner Circle</span>
       </motion.button>
     </div>
   );

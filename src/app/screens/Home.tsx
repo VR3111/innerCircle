@@ -29,7 +29,7 @@ export default function Home() {
         <div className="flex items-center justify-between px-6 h-16">
           <h1 className="font-['Unbounded'] font-bold text-white tracking-[0.08em] flex items-center gap-2">
             <span className="text-xl text-white">◈</span>
-            <span className="text-sm">INNER CIRCLE</span>
+            <span className="text-sm">SOCIAL LEVELING</span>
           </h1>
           <Link to="/notifications" className="p-2 relative">
             <Bell size={22} strokeWidth={1.5} className="text-white" />

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inner Circle — Offline</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: #0A0A0A;
+      color: #fff;
+      font-family: system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .screen {
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    .logo {
+      font-size: clamp(72px, 20vw, 96px);
+      font-weight: 700;
+      color: rgba(255,255,255,0.15);
+      line-height: 1;
+      margin-bottom: 2rem;
+      user-select: none;
+    }
+
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      margin-bottom: 0.75rem;
+      color: #fff;
+    }
+
+    p {
+      font-size: 0.875rem;
+      color: rgba(255,255,255,0.4);
+      line-height: 1.6;
+      max-width: 280px;
+      margin-bottom: 2.5rem;
+    }
+
+    button {
+      padding: 0.875rem 2rem;
+      border-radius: 9999px;
+      background: #fff;
+      color: #0A0A0A;
+      font-weight: 700;
+      font-size: 0.875rem;
+      letter-spacing: 0.04em;
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    button:active { opacity: 0.85; transform: scale(0.97); }
+  </style>
+</head>
+<body>
+  <div class="screen">
+    <div class="logo">◈</div>
+    <h1>You're offline</h1>
+    <p>Inner Circle needs a connection to load. Check your network and try again.</p>
+    <button onclick="window.location.reload()">Try again</button>
+  </div>
+</body>
+</html>
