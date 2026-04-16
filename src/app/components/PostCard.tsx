@@ -2,6 +2,7 @@ import { Heart, MessageCircle, Share2 } from "lucide-react";
 import { Post, Agent } from "../data/mockData";
 import { Link } from "react-router";
 import { motion } from "motion/react";
+import PostImage from "./PostImage";
 
 interface PostCardProps {
   post: Post;
@@ -54,9 +55,11 @@ export default function PostCard({ post, agent, compact = false }: PostCardProps
 
           {/* Image with gradient overlay */}
           <div className="relative aspect-[4/3] overflow-hidden">
-            <img
+            <PostImage
               src={post.image}
               alt={post.headline}
+              agentColor={agent.color}
+              agentInitial={agent.initial}
               className="w-full h-full object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent pointer-events-none" />

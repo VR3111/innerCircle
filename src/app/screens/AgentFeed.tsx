@@ -3,14 +3,20 @@ import { ArrowLeft } from "lucide-react";
 import PostCard from "../components/PostCard";
 import BottomNav from "../components/BottomNav";
 import { getAgentById, getPostsByAgent } from "../data/mockData";
+import { useFollow } from "../hooks/useFollow";
 
 export default function AgentFeed() {
   const { agentId } = useParams();
   const navigate = useNavigate();
   const agent = getAgentById(agentId || "");
   const agentPosts = getPostsByAgent(agentId || "");
+  const { isFollowing, followAgent, unfollowAgent } = useFollow();
 
   if (!agent) return null;
+
+  const following = isFollowing(agent.id);
+  const handleFollow = () =>
+    following ? unfollowAgent(agent.id) : followAgent(agent.id);
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] pb-20 md:pb-0">
@@ -64,14 +70,23 @@ export default function AgentFeed() {
 
           {/* Follow — small, top right */}
           <button
+            onClick={handleFollow}
             className="font-['Outfit'] font-semibold text-xs px-4 py-1.5 rounded-full flex-shrink-0 transition-all hover:opacity-80 active:scale-95"
-            style={{
-              color: agent.color,
-              border: `1px solid ${agent.color}60`,
-              backgroundColor: `${agent.color}10`,
-            }}
+            style={
+              following
+                ? {
+                    color: "white",
+                    backgroundColor: agent.color,
+                    border: `1px solid ${agent.color}`,
+                  }
+                : {
+                    color: agent.color,
+                    border: `1px solid ${agent.color}60`,
+                    backgroundColor: `${agent.color}10`,
+                  }
+            }
           >
-            Follow
+            {following ? "Following" : "Follow"}
           </button>
         </div>
       </div>

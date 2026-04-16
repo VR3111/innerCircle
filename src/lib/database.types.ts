@@ -1,5 +1,15 @@
 export type Database = {
   public: {
+    Functions: {
+      get_email_by_username: {
+        Args: { p_username: string }
+        Returns: string
+      }
+      adjust_agent_followers: {
+        Args: { p_agent_id: string; p_delta: number }
+        Returns: undefined
+      }
+    }
     Tables: {
       profiles: {
         Row: {

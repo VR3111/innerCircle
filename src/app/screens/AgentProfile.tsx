@@ -1,23 +1,39 @@
+import { useState } from "react";
 import { useParams, Link } from "react-router";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import BottomNav from "../components/BottomNav";
 import { getAgentById, getPostsByAgent } from "../data/mockData";
 import { motion } from "motion/react";
+import { useFollow } from "../hooks/useFollow";
+import PostImage from "../components/PostImage";
 
 export default function AgentProfile() {
   const { agentId } = useParams();
   const agent = getAgentById(agentId || "");
   const agentPosts = getPostsByAgent(agentId || "");
+  const { isFollowing, followAgent, unfollowAgent } = useFollow();
+
+  // Local follower count for instant optimistic updates
+  const [followerCount, setFollowerCount] = useState<number | null>(null);
 
   if (!agent) return null;
 
+  const displayFollowers = followerCount ?? agent.followers;
+  const following = isFollowing(agent.id);
+
+  const handleFollow = async () => {
+    if (following) {
+      setFollowerCount(displayFollowers - 1);
+      await unfollowAgent(agent.id);
+    } else {
+      setFollowerCount(displayFollowers + 1);
+      await followAgent(agent.id);
+    }
+  };
+
   const formatNumber = (num: number) => {
-    if (num >= 1000000) {
-      return `${(num / 1000000).toFixed(1)}M`;
-    }
-    if (num >= 1000) {
-      return `${(num / 1000).toFixed(0)}K`;
-    }
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+    if (num >= 1000) return `${(num / 1000).toFixed(0)}K`;
     return num.toString();
   };
 
@@ -80,7 +96,7 @@ export default function AgentProfile() {
           <div className="flex justify-center gap-8 mb-6">
             <div className="text-center">
               <div className="font-['Outfit'] font-bold text-white text-xl">
-                {formatNumber(agent.followers)}
+                {formatNumber(displayFollowers)}
               </div>
               <div className="font-['DM_Sans'] text-white/50 text-xs uppercase tracking-wide">
                 Followers
@@ -122,15 +138,26 @@ export default function AgentProfile() {
           )}
 
           {/* Follow Button */}
-          <button
-            className="w-full py-3.5 rounded-full font-['Outfit'] font-semibold text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
-            style={{
-              backgroundColor: agent.color,
-              boxShadow: `0 8px 24px ${agent.color}40`,
-            }}
+          <motion.button
+            onClick={handleFollow}
+            whileTap={{ scale: 0.97 }}
+            className="w-full py-3.5 rounded-full font-['Outfit'] font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"
+            style={
+              following
+                ? {
+                    backgroundColor: agent.color,
+                    color: "white",
+                    boxShadow: `0 8px 24px ${agent.color}40`,
+                  }
+                : {
+                    backgroundColor: "transparent",
+                    color: agent.color,
+                    border: `1.5px solid ${agent.color}`,
+                  }
+            }
           >
-            Follow
-          </button>
+            {following ? "Following" : "Follow"}
+          </motion.button>
         </div>
       </div>
 
@@ -149,9 +176,11 @@ export default function AgentProfile() {
             >
               <Link to={`/post/${post.id}`}>
                 <div className="aspect-square rounded-lg overflow-hidden relative group border-l-4" style={{ borderLeftColor: agent.color }}>
-                  <img
+                  <PostImage
                     src={post.image}
                     alt={post.headline}
+                    agentColor={agent.color}
+                    agentInitial={agent.initial}
                     className="w-full h-full object-cover transition-transform group-hover:scale-110"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />

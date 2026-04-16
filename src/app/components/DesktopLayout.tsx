@@ -2,6 +2,7 @@ import { Outlet, Link, useLocation } from "react-router";
 import { Bell, Home, TrendingUp, Compass, User, TrendingDown } from "lucide-react";
 import { agents, posts, getAgentById } from "../data/mockData";
 import { NotificationsProvider, useNotifications } from "../contexts/NotificationsContext";
+import { FollowProvider, useFollow } from "../hooks/useFollow";
 
 const formatNumber = (num: number) => {
   if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
@@ -22,6 +23,12 @@ const trendingPosts = [...posts].sort((a, b) => b.reactions - a.reactions).slice
 function DesktopLayoutInner() {
   const location = useLocation();
   const { unreadCount } = useNotifications();
+  const { followedIds } = useFollow();
+
+  // Show only followed agents in the sidebar; fall back to all when following none
+  const sidebarAgents = followedIds.size > 0
+    ? agents.filter((a) => followedIds.has(a.id))
+    : agents;
 
   const isActive = (path: string) => {
     return location.pathname === path || location.pathname.startsWith(path + "/");
@@ -95,9 +102,9 @@ function DesktopLayoutInner() {
           {/* Agent List */}
           <div className="flex-1 overflow-y-auto py-3 scrollbar-hide">
             <div className="px-5 pt-1 pb-3 text-white/25 text-[9px] font-['DM_Sans'] uppercase tracking-[0.18em]">
-              Agents
+              {followedIds.size > 0 ? "Following" : "Agents"}
             </div>
-            {agents.map((agent) => {
+            {sidebarAgents.map((agent) => {
               const active =
                 location.pathname === `/feed/${agent.id}` ||
                 location.pathname === `/agent/${agent.id}`;
@@ -314,7 +321,9 @@ function DesktopLayoutInner() {
 export default function DesktopLayout() {
   return (
     <NotificationsProvider>
-      <DesktopLayoutInner />
+      <FollowProvider>
+        <DesktopLayoutInner />
+      </FollowProvider>
     </NotificationsProvider>
   );
 }

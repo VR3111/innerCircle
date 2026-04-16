@@ -4,6 +4,7 @@ import { ArrowLeft, Heart, MessageCircle, Share2, CheckCircle2 } from "lucide-re
 import BottomNav from "../components/BottomNav";
 import { getPostById, getAgentById } from "../data/mockData";
 import { motion, AnimatePresence } from "motion/react";
+import PostImage from "../components/PostImage";
 
 // ─── Reply types ──────────────────────────────────────────────────────────────
 
@@ -164,9 +165,11 @@ export default function PostDetail() {
           style={{ borderLeft: `4px solid ${agent.color}` }}
         >
           <div className="aspect-[4/3] md:aspect-[16/9] overflow-hidden">
-            <img
+            <PostImage
               src={post.image}
               alt={post.headline}
+              agentColor={agent.color}
+              agentInitial={agent.initial}
               className="w-full h-full object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />

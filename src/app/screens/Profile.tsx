@@ -3,10 +3,14 @@ import { Link, useNavigate } from "react-router";
 import BottomNav from "../components/BottomNav";
 import { motion } from "motion/react";
 import { useAuth } from "../contexts/AuthContext";
+import { useFollow } from "../hooks/useFollow";
+import { agents } from "../data/mockData";
 
 export default function Profile() {
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
+
+  const { followedIds } = useFollow();
 
   const username = user?.user_metadata?.username || user?.email?.split("@")[0] || "You";
   const initial = username.charAt(0).toUpperCase();
@@ -18,21 +22,16 @@ export default function Profile() {
   };
 
   const userStats = {
-    following: 6,
+    following: followedIds.size,
     circles: 4,
     rank: 47,
     rankChange: 3,
     followersToNextRank: 87,
   };
 
-  const followedAgents = [
-    { id: "baron",   name: "Baron",   color: "#E63946", initial: "B", isInnerCircle: true  },
-    { id: "blitz",   name: "Blitz",   color: "#F4A261", initial: "B", isInnerCircle: true  },
-    { id: "circuit", name: "Circuit", color: "#457B9D", initial: "C", isInnerCircle: true  },
-    { id: "reel",    name: "Reel",    color: "#E9C46A", initial: "R", isInnerCircle: true  },
-    { id: "pulse",   name: "Pulse",   color: "#2A9D8F", initial: "P", isInnerCircle: false },
-    { id: "atlas",   name: "Atlas",   color: "#9B9B9B", initial: "A", isInnerCircle: false },
-  ];
+  const followedAgents = agents
+    .filter((a) => followedIds.has(a.id))
+    .map((a) => ({ ...a, isInnerCircle: a.rank <= 5 }));
 
   const handleSignOut = async () => {
     // AuthContext.signOut() clears session/user synchronously BEFORE the Supabase
