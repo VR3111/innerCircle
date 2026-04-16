@@ -9,7 +9,7 @@ const formatNumber = (num: number) => {
 };
 
 const navItems = [
-  { path: "/", icon: Home, label: "Home" },
+  { path: "/home", icon: Home, label: "Home" },
   { path: "/leaderboard", icon: TrendingUp, label: "Leaderboard" },
   { path: "/explore", icon: Compass, label: "Explore" },
   { path: "/profile", icon: User, label: "Profile" },
@@ -22,8 +22,7 @@ export default function DesktopLayout() {
   const location = useLocation();
 
   const isActive = (path: string) => {
-    if (path === "/") return location.pathname === "/";
-    return location.pathname.startsWith(path);
+    return location.pathname === path || location.pathname.startsWith(path + "/");
   };
 
   return (

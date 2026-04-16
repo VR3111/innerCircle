@@ -9,7 +9,7 @@ export default function Home() {
   const navigate = useNavigate();
 
   const handleAgentClick = (agentId: string) => {
-    if (agentId === "all") return; // already on home
+    if (agentId === "all") return; // already on /home
     navigate(`/feed/${agentId}`);
   };
 

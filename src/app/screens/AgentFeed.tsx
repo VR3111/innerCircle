@@ -1,4 +1,4 @@
-import { useParams, Link } from "react-router";
+import { useParams, useNavigate } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import PostCard from "../components/PostCard";
 import BottomNav from "../components/BottomNav";
@@ -6,6 +6,7 @@ import { getAgentById, getPostsByAgent } from "../data/mockData";
 
 export default function AgentFeed() {
   const { agentId } = useParams();
+  const navigate = useNavigate();
   const agent = getAgentById(agentId || "");
   const agentPosts = getPostsByAgent(agentId || "");
 
@@ -19,12 +20,12 @@ export default function AgentFeed() {
         <div className="max-w-[375px] md:max-w-none mx-auto flex items-center gap-4 px-4 md:px-6 h-16">
 
           {/* Back */}
-          <Link
-            to="/"
+          <button
+            onClick={() => navigate(-1)}
             className="p-1.5 -ml-1.5 rounded-xl text-white/40 hover:text-white hover:bg-white/5 transition-all flex-shrink-0"
           >
             <ArrowLeft size={20} strokeWidth={1.5} />
-          </Link>
+          </button>
 
           {/* Agent identity */}
           <div className="flex items-center gap-3 flex-1 min-w-0">

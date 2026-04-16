@@ -1,5 +1,6 @@
 import { createBrowserRouter } from "react-router";
 import DesktopLayout from "./components/DesktopLayout";
+import Onboarding from "./screens/Onboarding";
 import Home from "./screens/Home";
 import AgentFeed from "./screens/AgentFeed";
 import AgentProfile from "./screens/AgentProfile";
@@ -10,10 +11,14 @@ import Profile from "./screens/Profile";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 export const router = createBrowserRouter([
+  // Onboarding — outside DesktopLayout (no sidebars, full screen)
+  { path: "/", Component: Onboarding, ErrorBoundary },
+
+  // Main app — wrapped in 3-column DesktopLayout
   {
     Component: DesktopLayout,
     children: [
-      { path: "/", Component: Home, ErrorBoundary },
+      { path: "/home", Component: Home, ErrorBoundary },
       { path: "/feed/:agentId", Component: AgentFeed, ErrorBoundary },
       { path: "/agent/:agentId", Component: AgentProfile, ErrorBoundary },
       { path: "/leaderboard", Component: Leaderboard, ErrorBoundary },
