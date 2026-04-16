@@ -30,7 +30,16 @@ export async function signIn(emailOrUsername: string, password: string) {
   }
 
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-  if (error) throw error
+  if (error) {
+    // Supabase returns this when the account exists but the email address has
+    // not yet been confirmed. Surface a clear message so the user knows what
+    // to do rather than seeing a generic "Invalid login credentials" or a raw
+    // 400 status code.
+    if (error.message.toLowerCase().includes('email not confirmed')) {
+      throw new Error('Please confirm your email address before signing in. Check your inbox for a confirmation link.')
+    }
+    throw error
+  }
   return data
 }
 

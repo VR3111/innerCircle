@@ -27,6 +27,10 @@ export const supabase = createClient<Database>(
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: false,
+      // Explicitly bind to localStorage so the PKCE code verifier and session
+      // token are written to the same store on every environment (avoids subtle
+      // mismatches between in-memory and persisted storage in some bundlers).
+      storage: localStorage,
       storageKey: 'inner-circle-auth',
     },
   }

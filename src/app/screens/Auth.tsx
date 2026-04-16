@@ -19,6 +19,8 @@ export default function Auth() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  // Set to the email address when Supabase requires confirmation before sign-in
+  const [confirmationEmail, setConfirmationEmail] = useState('')
 
   // Already logged in — skip to the right place
   useEffect(() => {
@@ -62,7 +64,13 @@ export default function Auth() {
     setSubmitting(true)
     try {
       if (mode === 'signup') {
-        await signUp(emailOrUsername, password, username.trim())
+        const data = await signUp(emailOrUsername, password, username.trim())
+        if (!data.session) {
+          // Supabase returned no session — email confirmation is required before
+          // the account is active. Show the confirmation screen.
+          setConfirmationEmail(emailOrUsername)
+          return
+        }
         // Mark as new user so onboarding runs; cleared to null on sign-out
         localStorage.setItem('onboarded', 'false')
         navigate('/', { replace: true })
@@ -89,6 +97,52 @@ export default function Auth() {
   }
 
   if (loading) return null
+
+  // ── Email confirmation pending ────────────────────────────────────────────
+  if (confirmationEmail) {
+    return (
+      <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center px-6">
+        <motion.div
+          initial={{ scale: 0.85, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+          className="w-full max-w-[380px] text-center"
+        >
+          {/* Icon */}
+          <div className="w-20 h-20 rounded-full bg-[#2A9D8F]/15 border-2 border-[#2A9D8F]/40 flex items-center justify-center mx-auto mb-6">
+            <span className="font-['Outfit'] font-extrabold text-[#2A9D8F] text-3xl leading-none">
+              ✉
+            </span>
+          </div>
+
+          <h1 className="font-['Unbounded'] font-bold text-white text-xl leading-snug mb-3">
+            Check your inbox
+          </h1>
+
+          <p className="font-['DM_Sans'] text-white/50 text-sm leading-relaxed mb-2">
+            We sent a confirmation link to
+          </p>
+          <p className="font-['DM_Sans'] text-white/80 text-sm font-semibold mb-8">
+            {confirmationEmail}
+          </p>
+
+          <p className="font-['DM_Sans'] text-white/30 text-xs leading-relaxed mb-8">
+            Click the link in the email to activate your account, then come back here to sign in.
+          </p>
+
+          <button
+            onClick={() => {
+              setConfirmationEmail('')
+              switchMode('signin')
+            }}
+            className="w-full py-4 rounded-2xl bg-white text-black font-['Outfit'] font-bold text-base tracking-wide hover:bg-white/90 active:scale-[0.98] transition-all"
+          >
+            Back to Sign In
+          </button>
+        </motion.div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] flex flex-col">
