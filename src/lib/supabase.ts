@@ -1,10 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from './database.types'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 
-// Production readiness check — missing vars mean no Supabase connection
+// Diagnostic log — visible in browser console and Vercel function logs.
+// Confirms whether env vars are being picked up at build time.
+console.log('[Supabase] VITE_SUPABASE_URL:', supabaseUrl ? 'set' : 'MISSING')
+console.log('[Supabase] VITE_SUPABASE_ANON_KEY:', supabaseAnonKey ? 'set' : 'MISSING')
+
 if (!supabaseUrl) {
   console.warn(
     '[Inner Circle] Missing VITE_SUPABASE_URL. ' +
@@ -18,9 +22,16 @@ if (!supabaseAnonKey) {
   )
 }
 
+// Guard: createClient throws if given an empty string URL (Supabase v2 parses
+// it with `new URL()` internally). Fall back to a placeholder that prevents the
+// module from crashing — all queries will fail gracefully with a network error
+// rather than a ReferenceError that breaks every importing module.
+const resolvedUrl  = supabaseUrl  || 'https://placeholder.supabase.co'
+const resolvedKey  = supabaseAnonKey || 'placeholder-key'
+
 export const supabase = createClient<Database>(
-  supabaseUrl ?? '',
-  supabaseAnonKey ?? '',
+  resolvedUrl,
+  resolvedKey,
   {
     auth: {
       flowType: 'pkce',
