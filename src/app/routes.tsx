@@ -8,6 +8,7 @@ import Leaderboard from "./screens/Leaderboard";
 import PostDetail from "./screens/PostDetail";
 import Explore from "./screens/Explore";
 import Profile from "./screens/Profile";
+import Notifications from "./screens/Notifications";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 export const router = createBrowserRouter([
@@ -25,6 +26,7 @@ export const router = createBrowserRouter([
       { path: "/post/:postId", Component: PostDetail, ErrorBoundary },
       { path: "/explore", Component: Explore, ErrorBoundary },
       { path: "/profile", Component: Profile, ErrorBoundary },
+      { path: "/notifications", Component: Notifications, ErrorBoundary },
     ],
   },
 ]);

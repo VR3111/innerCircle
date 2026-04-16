@@ -1,5 +1,6 @@
-import { useNavigate } from "react-router";
+import { useNavigate, Link } from "react-router";
 import { Bell } from "lucide-react";
+import { useNotifications } from "../contexts/NotificationsContext";
 import AgentDots from "../components/AgentDots";
 import PostCard from "../components/PostCard";
 import BottomNav from "../components/BottomNav";
@@ -7,6 +8,7 @@ import { posts, getAgentById } from "../data/mockData";
 
 export default function Home() {
   const navigate = useNavigate();
+  const { unreadCount } = useNotifications();
 
   const handleAgentClick = (agentId: string) => {
     if (agentId === "all") return; // already on /home
@@ -29,10 +31,12 @@ export default function Home() {
             <span className="text-xl text-white">◈</span>
             <span className="text-sm">INNER CIRCLE</span>
           </h1>
-          <button className="p-2 relative">
+          <Link to="/notifications" className="p-2 relative">
             <Bell size={22} strokeWidth={1.5} className="text-white" />
-            <div className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#E63946] rounded-full" />
-          </button>
+            {unreadCount > 0 && (
+              <div className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#E63946] rounded-full" />
+            )}
+          </Link>
         </div>
         <AgentDots activeAgent="all" onAgentClick={handleAgentClick} />
       </div>

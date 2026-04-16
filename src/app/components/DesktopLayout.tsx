@@ -1,6 +1,7 @@
 import { Outlet, Link, useLocation } from "react-router";
 import { Bell, Home, TrendingUp, Compass, User, TrendingDown } from "lucide-react";
 import { agents, posts, getAgentById } from "../data/mockData";
+import { NotificationsProvider, useNotifications } from "../contexts/NotificationsContext";
 
 const formatNumber = (num: number) => {
   if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
@@ -18,8 +19,9 @@ const navItems = [
 const top5 = [...agents].sort((a, b) => a.rank - b.rank).slice(0, 5);
 const trendingPosts = [...posts].sort((a, b) => b.reactions - a.reactions).slice(0, 3);
 
-export default function DesktopLayout() {
+function DesktopLayoutInner() {
   const location = useLocation();
+  const { unreadCount } = useNotifications();
 
   const isActive = (path: string) => {
     return location.pathname === path || location.pathname.startsWith(path + "/");
@@ -44,10 +46,21 @@ export default function DesktopLayout() {
               <span className="text-[#E63946] text-xl">◈</span>
               <span className="text-[11px]">INNER CIRCLE</span>
             </h1>
-            <button className="relative p-1.5 -mr-1.5 rounded-xl hover:bg-white/5 transition-colors">
-              <Bell size={19} strokeWidth={1.5} className="text-white/50" />
-              <div className="absolute top-1 right-1 w-2 h-2 bg-[#E63946] rounded-full border-2 border-[#0A0A0A]" />
-            </button>
+            <Link
+              to="/notifications"
+              className={`relative p-1.5 -mr-1.5 rounded-xl hover:bg-white/5 transition-colors ${
+                isActive("/notifications") ? "bg-white/8" : ""
+              }`}
+            >
+              <Bell
+                size={19}
+                strokeWidth={1.5}
+                className={isActive("/notifications") ? "text-white" : "text-white/50"}
+              />
+              {unreadCount > 0 && (
+                <div className="absolute top-1 right-1 w-2 h-2 bg-[#E63946] rounded-full border-2 border-[#0A0A0A]" />
+              )}
+            </Link>
           </div>
 
           {/* Navigation — Twitter/X style */}
@@ -295,5 +308,13 @@ export default function DesktopLayout() {
         </aside>
       </div>
     </>
+  );
+}
+
+export default function DesktopLayout() {
+  return (
+    <NotificationsProvider>
+      <DesktopLayoutInner />
+    </NotificationsProvider>
   );
 }
