@@ -9,10 +9,11 @@ type Mode = 'signin' | 'signup'
 
 export default function Auth() {
   const navigate = useNavigate()
-  const { session, loading } = useAuth()
+  const { session, loading, user } = useAuth()
 
   const [mode, setMode] = useState<Mode>('signin')
-  const [email, setEmail] = useState('')
+  // In sign-in mode this holds email OR username; in sign-up mode it's always email
+  const [emailOrUsername, setEmailOrUsername] = useState('')
   const [password, setPassword] = useState('')
   const [username, setUsername] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -22,14 +23,29 @@ export default function Auth() {
   // Already logged in — skip to the right place
   useEffect(() => {
     if (!loading && session) {
-      navigate(localStorage.getItem('onboarded') ? '/home' : '/', { replace: true })
+      const onboarded = localStorage.getItem('onboarded')
+      if (onboarded === 'true') {
+        navigate('/home', { replace: true })
+        return
+      }
+      // 'false' means just signed up on this device → show onboarding
+      // null (cleared/new device) → fall back to account age
+      if (onboarded !== 'false') {
+        const createdAt = user?.created_at ? new Date(user.created_at).getTime() : 0
+        const isReturningUser = Date.now() - createdAt > 60_000
+        if (isReturningUser) {
+          navigate('/home', { replace: true })
+          return
+        }
+      }
+      navigate('/', { replace: true })
     }
-  }, [session, loading, navigate])
+  }, [session, loading, navigate, user])
 
   const switchMode = (next: Mode) => {
     setMode(next)
     setError('')
-    setEmail('')
+    setEmailOrUsername('')
     setPassword('')
     setUsername('')
   }
@@ -46,13 +62,24 @@ export default function Auth() {
     setSubmitting(true)
     try {
       if (mode === 'signup') {
-        await signUp(email, password, username.trim())
-        // New user → onboarding
+        await signUp(emailOrUsername, password, username.trim())
+        // Mark as new user so onboarding runs; cleared to null on sign-out
+        localStorage.setItem('onboarded', 'false')
         navigate('/', { replace: true })
       } else {
-        await signIn(email, password)
-        // Existing user → skip onboarding if already done
-        navigate(localStorage.getItem('onboarded') ? '/home' : '/', { replace: true })
+        const data = await signIn(emailOrUsername, password)
+        const onboarded = localStorage.getItem('onboarded')
+        if (onboarded === 'true') {
+          navigate('/home', { replace: true })
+        } else if (onboarded !== 'false') {
+          // No flag (cleared/new device) — use account age as fallback
+          const createdAt = data.user?.created_at ? new Date(data.user.created_at).getTime() : 0
+          const isReturningUser = Date.now() - createdAt > 60_000
+          navigate(isReturningUser ? '/home' : '/', { replace: true })
+        } else {
+          // onboarded === 'false': signed up on this device, hasn't completed onboarding
+          navigate('/', { replace: true })
+        }
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
@@ -65,7 +92,6 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] flex flex-col">
-      {/* Desktop: centered card; Mobile: full screen */}
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-[380px]">
 
@@ -76,8 +102,10 @@ export default function Auth() {
             transition={{ type: 'spring', stiffness: 200, damping: 20 }}
             className="text-center mb-12"
           >
-            <div className="font-['Unbounded'] font-bold text-white leading-none mb-3"
-              style={{ fontSize: 'clamp(56px, 15vw, 72px)' }}>
+            <div
+              className="font-['Unbounded'] font-bold text-white leading-none mb-3"
+              style={{ fontSize: 'clamp(56px, 15vw, 72px)' }}
+            >
               ◈
             </div>
             <div className="font-['Unbounded'] font-bold text-white text-[10px] tracking-[0.22em] opacity-60">
@@ -97,9 +125,7 @@ export default function Auth() {
                 key={m}
                 onClick={() => switchMode(m)}
                 className={`flex-1 py-2.5 rounded-lg text-sm font-['Outfit'] font-semibold transition-all ${
-                  mode === m
-                    ? 'bg-white text-black'
-                    : 'text-white/40 hover:text-white/60'
+                  mode === m ? 'bg-white text-black' : 'text-white/40 hover:text-white/60'
                 }`}
               >
                 {m === 'signin' ? 'Sign In' : 'Sign Up'}
@@ -115,13 +141,13 @@ export default function Auth() {
             onSubmit={handleSubmit}
             className="space-y-3"
           >
-            {/* Username (sign up only) */}
+            {/* Username field — sign up only */}
             <AnimatePresence initial={false}>
               {mode === 'signup' && (
                 <motion.div
                   key="username"
-                  initial={{ opacity: 0, height: 0, marginBottom: 0 }}
-                  animate={{ opacity: 1, height: 'auto', marginBottom: 0 }}
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
                   transition={{ duration: 0.22 }}
                   style={{ overflow: 'hidden' }}
@@ -138,11 +164,16 @@ export default function Auth() {
               )}
             </AnimatePresence>
 
+            {/*
+              Sign-in: type="text" to accept username or email (no "@" validation)
+              Sign-up: type="email" to enforce valid email format
+            */}
             <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              key={mode}               // remount on mode switch to reset browser autofill
+              type={mode === 'signin' ? 'text' : 'email'}
+              placeholder={mode === 'signin' ? 'Email or Username' : 'Email'}
+              value={emailOrUsername}
+              onChange={(e) => setEmailOrUsername(e.target.value)}
               autoComplete="email"
               required
               className="w-full bg-[#111111] border border-white/8 rounded-xl px-4 py-3.5 text-white font-['DM_Sans'] text-[15px] placeholder:text-white/25 focus:outline-none focus:border-white/25 transition-colors"
@@ -168,7 +199,7 @@ export default function Auth() {
               </button>
             </div>
 
-            {/* Error message */}
+            {/* Error */}
             <AnimatePresence>
               {error && (
                 <motion.p
@@ -194,16 +225,14 @@ export default function Auth() {
             </button>
           </motion.form>
 
-          {/* Sub-text */}
+          {/* Mode switch link */}
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
             className="text-center font-['DM_Sans'] text-white/20 text-xs mt-6"
           >
-            {mode === 'signup'
-              ? 'Already have an account? '
-              : "Don't have an account? "}
+            {mode === 'signup' ? 'Already have an account? ' : "Don't have an account? "}
             <button
               onClick={() => switchMode(mode === 'signup' ? 'signin' : 'signup')}
               className="text-white/40 hover:text-white/70 underline underline-offset-2 transition-colors"

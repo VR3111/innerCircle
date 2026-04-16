@@ -1,13 +1,12 @@
-import { Settings, ArrowLeft, CheckCircle2, TrendingUp, Lock, ArrowRight, LogOut } from "lucide-react";
+import { ArrowLeft, CheckCircle2, TrendingUp, Lock, ArrowRight, LogOut } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import BottomNav from "../components/BottomNav";
 import { motion } from "motion/react";
 import { useAuth } from "../contexts/AuthContext";
-import { signOut } from "../../lib/auth";
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
 
   const username = user?.user_metadata?.username || user?.email?.split("@")[0] || "You";
   const initial = username.charAt(0).toUpperCase();
@@ -36,9 +35,11 @@ export default function Profile() {
   ];
 
   const handleSignOut = async () => {
-    await signOut();
-    localStorage.removeItem("onboarded");
-    navigate("/auth", { replace: true });
+    // AuthContext.signOut() clears session/user synchronously BEFORE the Supabase
+    // network call, so when navigate() fires below the session is already null.
+    // Auth.tsx's useEffect will therefore see no session and won't redirect back.
+    await signOut()
+    navigate('/auth', { replace: true })
   };
 
   return (
@@ -56,10 +57,10 @@ export default function Profile() {
             </Link>
             <button
               onClick={handleSignOut}
-              className="flex items-center gap-1.5 p-2 text-white/40 hover:text-[#E63946] transition-colors rounded-xl hover:bg-[#E63946]/5"
+              className="flex items-center gap-2 px-3 py-2 text-white/50 hover:text-[#E63946] hover:bg-[#E63946]/8 active:scale-95 transition-all rounded-xl border border-white/8 hover:border-[#E63946]/20"
             >
-              <LogOut size={18} strokeWidth={1.5} />
-              <span className="font-['DM_Sans'] text-xs hidden sm:inline">Sign out</span>
+              <LogOut size={16} strokeWidth={1.5} />
+              <span className="font-['DM_Sans'] text-xs font-medium">Sign out</span>
             </button>
           </div>
         </div>

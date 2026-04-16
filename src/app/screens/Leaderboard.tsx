@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { TrendingUp, TrendingDown, ArrowLeft } from "lucide-react";
-import { Link } from "react-router";
+import { TrendingUp, TrendingDown, ArrowLeft, ChevronRight } from "lucide-react";
+import { Link, useNavigate } from "react-router";
 import AgentDots from "../components/AgentDots";
 import BottomNav from "../components/BottomNav";
 import { agents, Agent } from "../data/mockData";
 import { motion } from "motion/react";
 
 export default function Leaderboard() {
+  const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState("all");
 
   const filteredAgents =
@@ -154,33 +155,34 @@ export default function Leaderboard() {
         ))}
       </div>
 
-      {/* Your Rank - Pinned at Bottom */}
+      {/* Your Rank - Pinned at Bottom (mobile only) */}
       <div className="md:hidden fixed bottom-16 left-0 right-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A] to-transparent pt-8 pb-4">
-        <div className="max-w-[375px] md:max-w-none mx-auto px-6">
-          <div className="bg-[#1A1A1A] rounded-2xl p-4 border border-white/10">
+        <div className="max-w-[375px] mx-auto px-6">
+          <motion.button
+            onClick={() => navigate('/profile')}
+            whileTap={{ scale: 0.97 }}
+            className="w-full bg-[#1A1A1A] rounded-2xl p-4 border border-white/10 hover:border-white/20 hover:bg-[#222222] active:bg-[#1A1A1A] transition-colors text-left"
+          >
             <div className="flex items-center gap-4">
-              <div className="text-white/50">
+              <div className="text-[#2A9D8F]">
                 <span className="font-['Outfit'] font-bold text-xl">#47</span>
               </div>
-              <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
-                <span className="font-['Outfit'] font-bold text-white text-sm">
-                  Y
-                </span>
+              <div className="w-10 h-10 rounded-full bg-[#2A9D8F]/15 border border-[#2A9D8F]/40 flex items-center justify-center flex-shrink-0">
+                <span className="font-['Outfit'] font-bold text-[#2A9D8F] text-sm">Y</span>
               </div>
               <div className="flex-1">
-                <div className="font-['Outfit'] font-semibold text-white">
-                  Your Rank
-                </div>
-                <div className="font-['DM_Sans'] text-xs text-white/50">
-                  Keep engaging to climb
-                </div>
+                <div className="font-['Outfit'] font-semibold text-white">Your Rank</div>
+                <div className="font-['DM_Sans'] text-xs text-white/40">Tap to view profile</div>
               </div>
-              <div className="flex items-center gap-1 text-[#2A9D8F]">
-                <TrendingUp size={14} />
-                <span className="font-['Outfit'] font-semibold text-sm">3</span>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-1 text-[#2A9D8F]">
+                  <TrendingUp size={13} strokeWidth={2} />
+                  <span className="font-['Outfit'] font-semibold text-sm">3</span>
+                </div>
+                <ChevronRight size={16} strokeWidth={1.5} className="text-white/25" />
               </div>
             </div>
-          </div>
+          </motion.button>
         </div>
       </div>
 

@@ -10,14 +10,38 @@ export async function signUp(email: string, password: string, username: string) 
   return data
 }
 
-export async function signIn(email: string, password: string) {
+/**
+ * Sign in with either an email address or a username.
+ * If the input contains "@" it is treated as an email directly.
+ * Otherwise it is treated as a username and the corresponding email is
+ * looked up via the get_email_by_username RPC function.
+ */
+export async function signIn(emailOrUsername: string, password: string) {
+  let email = emailOrUsername.trim()
+
+  if (!email.includes('@')) {
+    const { data, error } = await supabase.rpc('get_email_by_username', {
+      p_username: email,
+    })
+    if (error || !data) {
+      throw new Error('No account found with that username')
+    }
+    email = data as string
+  }
+
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
   if (error) throw error
   return data
 }
 
+/**
+ * Signs out from Supabase AND clears the local onboarding flag.
+ * Callers are still responsible for navigating away after this resolves.
+ */
 export async function signOut() {
   const { error } = await supabase.auth.signOut()
+  // Clear local onboarding state regardless of whether the network call succeeded
+  localStorage.removeItem('onboarded')
   if (error) throw error
 }
 

@@ -302,7 +302,7 @@ export default function Onboarding() {
 
   // Skip onboarding if already completed
   useEffect(() => {
-    if (localStorage.getItem("onboarded")) {
+    if (localStorage.getItem("onboarded") === "true") {
       navigate("/home", { replace: true });
     }
   }, [navigate]);
@@ -313,12 +313,12 @@ export default function Onboarding() {
   };
 
   const skip = () => {
-    localStorage.setItem("onboarded", "1");
+    localStorage.setItem("onboarded", "true");
     navigate("/home", { replace: true });
   };
 
   const finish = () => {
-    localStorage.setItem("onboarded", "1");
+    localStorage.setItem("onboarded", "true");
     navigate("/home", { replace: true });
   };
 
