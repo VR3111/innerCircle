@@ -2,16 +2,21 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 
-export function useLike(postId: string, initialLikeCount: number) {
+export function useLike(postId: string | undefined, initialLikeCount: number) {
   const { user } = useAuth()
   const [isLiked, setIsLiked] = useState(false)
   const [likeCount, setLikeCount] = useState(initialLikeCount)
+
+  // Sync likeCount when the initial value changes (e.g. post finishes loading)
+  useEffect(() => {
+    setLikeCount(initialLikeCount)
+  }, [initialLikeCount])
 
   // Check whether the current user has already liked this post.
   // Depends on user?.id rather than user to avoid re-running on every
   // Supabase token refresh, which produces a new user object each time.
   useEffect(() => {
-    if (!user) {
+    if (!user || !postId) {
       setIsLiked(false)
       return
     }
@@ -29,7 +34,7 @@ export function useLike(postId: string, initialLikeCount: number) {
   }, [postId, user?.id])
 
   const toggleLike = async () => {
-    if (!user) return
+    if (!user || !postId) return
 
     const wasLiked = isLiked
 

@@ -2,12 +2,12 @@ import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router";
 import { ArrowLeft, Heart, MessageCircle, Share2, CheckCircle2 } from "lucide-react";
 import BottomNav from "../components/BottomNav";
-import { getPostById, getAgentById } from "../data/mockData";
 import { motion, AnimatePresence } from "motion/react";
 import PostImage from "../components/PostImage";
 import { useLike } from "../hooks/useLike";
+import { usePost } from "../hooks/usePost";
 
-// ─── Reply types ──────────────────────────────────────────────────────────────
+// ─── Reply data ───────────────────────────────────────────────────────────────
 
 interface Reply {
   id: number;
@@ -18,7 +18,6 @@ interface Reply {
   isAgent?: boolean;
 }
 
-// Inner Circle replies — agent's personal reply first, then IC members
 const buildInnerCircleReplies = (agentName: string, agentInitial: string): Reply[] => [
   {
     id: 1,
@@ -82,6 +81,76 @@ const generalReplies: Reply[] = [
   },
 ];
 
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+
+function PostDetailSkeleton() {
+  return (
+    <div className="min-h-screen bg-[#0A0A0A] pb-20 md:pb-0 animate-pulse">
+      {/* Header */}
+      <div className="sticky top-0 z-50 bg-[#0A0A0A]/95 backdrop-blur-xl border-b border-white/5">
+        <div className="max-w-[375px] md:max-w-[640px] mx-auto flex items-center gap-3 px-4 md:px-6 h-16">
+          <div className="w-8 h-8 rounded-xl bg-white/8" />
+          <div className="flex items-center gap-2.5 flex-1">
+            <div className="w-8 h-8 rounded-full bg-white/8" />
+            <div className="h-4 w-28 rounded-md bg-white/8" />
+          </div>
+          <div className="h-7 w-16 rounded-full bg-white/8" />
+        </div>
+      </div>
+
+      {/* Image */}
+      <div className="max-w-[375px] md:max-w-[640px] mx-auto">
+        <div className="aspect-[4/3] md:aspect-[16/9] bg-white/5 border-l-4 border-white/8" />
+
+        {/* Text */}
+        <div className="px-5 md:px-8 pt-6 pb-5 border-l-4 border-white/8 space-y-3">
+          <div className="h-7 w-4/5 rounded-md bg-white/8" />
+          <div className="h-7 w-3/5 rounded-md bg-white/8" />
+          <div className="h-4 w-full rounded-md bg-white/5 mt-4" />
+          <div className="h-4 w-full rounded-md bg-white/5" />
+          <div className="h-4 w-2/3 rounded-md bg-white/5" />
+        </div>
+
+        {/* Engagement */}
+        <div className="flex gap-8 px-5 md:px-8 py-4 border-t border-b border-white/5">
+          <div className="h-5 w-12 rounded-md bg-white/8" />
+          <div className="h-5 w-12 rounded-md bg-white/8" />
+          <div className="h-5 w-12 rounded-md bg-white/8" />
+        </div>
+      </div>
+
+      <BottomNav />
+    </div>
+  );
+}
+
+// ─── Error state ──────────────────────────────────────────────────────────────
+
+function PostNotFound({ onBack }: { onBack: () => void }) {
+  return (
+    <div className="min-h-screen bg-[#0A0A0A] pb-20 md:pb-0">
+      <div className="sticky top-0 z-50 bg-[#0A0A0A]/95 backdrop-blur-xl border-b border-white/5">
+        <div className="max-w-[375px] md:max-w-[640px] mx-auto flex items-center px-4 md:px-6 h-16">
+          <button
+            onClick={onBack}
+            className="p-1.5 -ml-1.5 rounded-xl text-white/40 hover:text-white hover:bg-white/5 transition-all"
+          >
+            <ArrowLeft size={20} strokeWidth={1.5} />
+          </button>
+        </div>
+      </div>
+      <div className="flex flex-col items-center justify-center py-32 px-8 text-center">
+        <div className="text-4xl mb-4 opacity-20">◈</div>
+        <p className="font-['Outfit'] font-bold text-white/40 text-lg mb-2">Post not found</p>
+        <p className="font-['DM_Sans'] text-white/25 text-sm">
+          This post may have been removed or the link is invalid.
+        </p>
+      </div>
+      <BottomNav />
+    </div>
+  );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 type Tab = "inner" | "everyone";
@@ -90,13 +159,22 @@ export default function PostDetail() {
   const { postId } = useParams();
   const navigate = useNavigate();
 
-  const post = getPostById(postId || "");
-  const agent = post ? getAgentById(post.agentId) : null;
+  const { postWithAgent, loading, error } = usePost(postId);
 
-  const { isLiked, likeCount, toggleLike } = useLike(post.id, post.reactions);
+  // useLike is always called (hooks must not be conditional).
+  // When postId is undefined or the post is loading, it receives safe defaults
+  // and does nothing until the post resolves.
+  const { isLiked, likeCount, toggleLike } = useLike(
+    postWithAgent?.post.id,
+    postWithAgent?.post.reactions ?? 0,
+  );
+
   const [activeTab, setActiveTab] = useState<Tab>("inner");
 
-  if (!post || !agent) return null;
+  if (loading) return <PostDetailSkeleton />;
+  if (error || !postWithAgent) return <PostNotFound onBack={() => navigate(-1)} />;
+
+  const { post, agent } = postWithAgent;
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
@@ -122,7 +200,7 @@ export default function PostDetail() {
             <ArrowLeft size={20} strokeWidth={1.5} />
           </button>
 
-          {/* Agent — center */}
+          {/* Agent */}
           <Link
             to={`/agent/${agent.id}`}
             className="flex items-center gap-2.5 flex-1 min-w-0"
@@ -235,7 +313,6 @@ export default function PostDetail() {
 
           {/* Tab row */}
           <div className="flex items-center gap-1 mb-6 bg-[#111111] rounded-xl p-1">
-            {/* Inner Circle tab */}
             <button
               onClick={() => setActiveTab("inner")}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-['Outfit'] font-semibold transition-all ${
@@ -257,7 +334,6 @@ export default function PostDetail() {
               </span>
             </button>
 
-            {/* Everyone tab */}
             <button
               onClick={() => setActiveTab("everyone")}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-['Outfit'] font-semibold transition-all ${
@@ -279,7 +355,7 @@ export default function PostDetail() {
             </button>
           </div>
 
-          {/* Inner Circle description banner */}
+          {/* Inner Circle banner */}
           <AnimatePresence mode="wait">
             {activeTab === "inner" && (
               <motion.div
@@ -318,15 +394,11 @@ export default function PostDetail() {
                   transition={{ delay: index * 0.06 }}
                 >
                   {activeTab === "inner" ? (
-                    /* Inner Circle reply card */
                     <div
                       className="bg-[#111111] rounded-xl p-4 border-l-[3px]"
-                      style={{
-                        borderLeftColor: reply.isAgent ? agent.color : "#E9C46A",
-                      }}
+                      style={{ borderLeftColor: reply.isAgent ? agent.color : "#E9C46A" }}
                     >
                       <div className="flex items-start gap-3">
-                        {/* Avatar */}
                         <div
                           className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
                           style={
@@ -342,9 +414,7 @@ export default function PostDetail() {
                             {reply.avatar}
                           </span>
                         </div>
-
                         <div className="flex-1 min-w-0">
-                          {/* Name row */}
                           <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                             <span className="font-['Outfit'] font-bold text-white text-sm">
                               {reply.user}
@@ -377,7 +447,6 @@ export default function PostDetail() {
                       </div>
                     </div>
                   ) : (
-                    /* General reply card */
                     <div className="bg-[#111111] rounded-xl p-4">
                       <div className="flex items-start gap-3">
                         <div className="w-9 h-9 rounded-full bg-white/8 flex items-center justify-center flex-shrink-0">
@@ -406,7 +475,7 @@ export default function PostDetail() {
             </motion.div>
           </AnimatePresence>
 
-          {/* Upsell — only on Inner Circle tab */}
+          {/* Upsell */}
           {activeTab === "inner" && (
             <motion.div
               initial={{ opacity: 0, y: 12 }}
