@@ -5,6 +5,7 @@ import BottomNav from "../components/BottomNav";
 import { getPostById, getAgentById } from "../data/mockData";
 import { motion, AnimatePresence } from "motion/react";
 import PostImage from "../components/PostImage";
+import { useLike } from "../hooks/useLike";
 
 // ─── Reply types ──────────────────────────────────────────────────────────────
 
@@ -92,7 +93,7 @@ export default function PostDetail() {
   const post = getPostById(postId || "");
   const agent = post ? getAgentById(post.agentId) : null;
 
-  const [liked, setLiked] = useState(false);
+  const { isLiked, likeCount, toggleLike } = useLike(post.id, post.reactions);
   const [activeTab, setActiveTab] = useState<Tab>("inner");
 
   if (!post || !agent) return null;
@@ -202,21 +203,23 @@ export default function PostDetail() {
           transition={{ delay: 0.1 }}
           className="flex items-center gap-8 px-5 md:px-8 py-4 border-t border-b border-white/5"
         >
-          <button
-            onClick={() => setLiked((v) => !v)}
-            className="flex items-center gap-2 transition-all active:scale-90"
-            style={{ color: liked ? agent.color : "rgba(255,255,255,0.4)" }}
+          <motion.button
+            whileTap={{ scale: 0.82 }}
+            transition={{ type: "spring", stiffness: 400, damping: 17 }}
+            onClick={toggleLike}
+            className="flex items-center gap-2 transition-colors"
+            style={{ color: isLiked ? agent.color : "rgba(255,255,255,0.4)" }}
           >
             <Heart
               size={22}
-              strokeWidth={liked ? 0 : 1.5}
-              fill={liked ? agent.color : "none"}
-              className="transition-all"
+              strokeWidth={isLiked ? 0 : 1.5}
+              fill={isLiked ? agent.color : "none"}
+              className="transition-all duration-150"
             />
             <span className="font-['DM_Sans'] text-sm">
-              {formatNumber(post.reactions + (liked ? 1 : 0))}
+              {formatNumber(likeCount)}
             </span>
-          </button>
+          </motion.button>
           <button className="flex items-center gap-2 text-white/40 hover:text-white/70 transition-colors">
             <MessageCircle size={22} strokeWidth={1.5} />
             <span className="font-['DM_Sans'] text-sm">{formatNumber(post.replies)}</span>

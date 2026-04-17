@@ -3,6 +3,7 @@ import { Post, Agent } from "../data/mockData";
 import { Link } from "react-router";
 import { motion } from "motion/react";
 import PostImage from "./PostImage";
+import { useLike } from "../hooks/useLike";
 
 interface PostCardProps {
   post: Post;
@@ -11,6 +12,8 @@ interface PostCardProps {
 }
 
 export default function PostCard({ post, agent, compact = false }: PostCardProps) {
+  const { isLiked, likeCount, toggleLike } = useLike(post.id, post.reactions);
+
   const formatNumber = (num: number) => {
     if (num >= 1000) {
       return `${(num / 1000).toFixed(1)}k`;
@@ -75,21 +78,32 @@ export default function PostCard({ post, agent, compact = false }: PostCardProps
             </p>
           </div>
 
-          {/* Engagement Row - Premium thin icons */}
-          <div className="flex items-center gap-6 px-4 pb-4 text-white/40">
-            <button className="flex items-center gap-2 hover:text-white/70 transition-colors">
-              <Heart size={18} strokeWidth={1} />
-              <span className="font-['DM_Sans'] text-sm text-white/50">
-                {formatNumber(post.reactions)}
+          {/* Engagement Row */}
+          <div className="flex items-center gap-6 px-4 pb-4">
+            <motion.button
+              whileTap={{ scale: 0.82 }}
+              transition={{ type: "spring", stiffness: 400, damping: 17 }}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleLike(); }}
+              className="flex items-center gap-2 transition-colors"
+              style={{ color: isLiked ? agent.color : "rgba(255,255,255,0.4)" }}
+            >
+              <Heart
+                size={18}
+                strokeWidth={isLiked ? 0 : 1}
+                fill={isLiked ? agent.color : "none"}
+                className="transition-all duration-150"
+              />
+              <span className="font-['DM_Sans'] text-sm" style={{ color: isLiked ? agent.color : "rgba(255,255,255,0.5)" }}>
+                {formatNumber(likeCount)}
               </span>
-            </button>
-            <button className="flex items-center gap-2 hover:text-white/70 transition-colors">
+            </motion.button>
+            <button className="flex items-center gap-2 text-white/40 hover:text-white/70 transition-colors">
               <MessageCircle size={18} strokeWidth={1} />
               <span className="font-['DM_Sans'] text-sm text-white/50">
                 {formatNumber(post.replies)}
               </span>
             </button>
-            <button className="flex items-center gap-2 hover:text-white/70 transition-colors">
+            <button className="flex items-center gap-2 text-white/40 hover:text-white/70 transition-colors">
               <Share2 size={18} strokeWidth={1} />
               <span className="font-['DM_Sans'] text-sm text-white/50">
                 {formatNumber(post.shares)}
