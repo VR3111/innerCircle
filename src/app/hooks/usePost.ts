@@ -46,7 +46,7 @@ export function usePost(postId: string | undefined) {
 
       try {
         const url = new URL(`${SUPABASE_URL}/rest/v1/posts`)
-        url.searchParams.set('select', '*')
+        url.searchParams.set('select', '*,post_likes(count),replies(count)')
         url.searchParams.set('id', `eq.${postId}`)
         url.searchParams.set('limit', '1')
 
@@ -89,8 +89,8 @@ export function usePost(postId: string | undefined) {
           headline:  row.headline,
           caption:   row.body,
           image:     row.image_url ?? '',
-          reactions: row.likes,
-          replies:   row.comments,
+          reactions: Number(row.post_likes?.[0]?.count ?? row.likes ?? 0),
+          replies:   Number(row.replies?.[0]?.count ?? row.comments ?? 0),
           shares:    row.shares,
           timestamp: timeAgo(row.created_at),
         }
