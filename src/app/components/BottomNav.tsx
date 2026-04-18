@@ -1,12 +1,18 @@
 import { Home, TrendingUp, Compass, User } from "lucide-react";
 import { Link, useLocation } from "react-router";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function BottomNav() {
   const location = useLocation();
+  const { user } = useAuth();
 
   const isActive = (path: string) => {
     return location.pathname === path || location.pathname.startsWith(path + "/");
   };
+
+  const username = user?.user_metadata?.username || user?.email?.split("@")[0] || "";
+  const initial = username.charAt(0).toUpperCase();
+  const profileActive = isActive("/profile");
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0A0A0A] border-t border-white/10 pb-safe">
@@ -32,12 +38,24 @@ export default function BottomNav() {
             className={isActive("/explore") ? "text-white" : "text-white/40"}
           />
         </Link>
-        <Link to="/profile" className="p-3">
-          <User
-            size={24}
-            strokeWidth={1.5}
-            className={isActive("/profile") ? "text-white" : "text-white/40"}
-          />
+        <Link to="/profile" className="p-3 flex items-center justify-center">
+          {user && initial ? (
+            <div
+              className={`w-6 h-6 rounded-full flex items-center justify-center font-['Outfit'] font-bold text-[11px] transition-all ${
+                profileActive
+                  ? "bg-[#2A9D8F] text-white ring-2 ring-[#2A9D8F]/40"
+                  : "bg-[#2A9D8F]/20 text-[#2A9D8F]"
+              }`}
+            >
+              {initial}
+            </div>
+          ) : (
+            <User
+              size={24}
+              strokeWidth={1.5}
+              className={profileActive ? "text-white" : "text-white/40"}
+            />
+          )}
         </Link>
       </div>
     </nav>

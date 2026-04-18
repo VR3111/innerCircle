@@ -1,5 +1,6 @@
 import { useNavigate, Link } from "react-router";
 import { Bell } from "lucide-react";
+import { motion } from "motion/react";
 import { useNotifications } from "../contexts/NotificationsContext";
 import AgentDots from "../components/AgentDots";
 import PostCard from "../components/PostCard";
@@ -23,8 +24,29 @@ export default function Home() {
       <div className="md:hidden sticky top-0 z-50 bg-[#0A0A0A]/95 backdrop-blur-xl border-b border-white/5">
         <div className="flex items-center justify-between px-6 h-16">
           <h1 className="font-['Unbounded'] font-bold text-white tracking-[0.08em] flex items-center gap-2">
-            <span className="text-xl text-white">◈</span>
-            <span className="text-sm">SOCIAL LEVELING</span>
+            {/* Slow 360° rotation — 10s per revolution, linear, forever */}
+            <motion.span
+              className="text-xl text-[#E9C46A] inline-block"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+            >
+              ◈
+            </motion.span>
+            <motion.span
+              className="text-sm tracking-[0.22em]"
+              style={{
+                background: 'linear-gradient(90deg, #ffffff 0%, #ffffff 35%, #E9C46A 50%, #ffffff 65%, #ffffff 100%)',
+                backgroundSize: '200% auto',
+                WebkitBackgroundClip: 'text',
+                backgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                color: 'transparent',
+              }}
+              animate={{ backgroundPosition: ['100% center', '-100% center'] }}
+              transition={{ duration: 4, ease: 'easeInOut', repeat: Infinity }}
+            >
+              SOCIAL LEVELING
+            </motion.span>
           </h1>
           <Link to="/notifications" className="p-2 relative">
             <Bell size={22} strokeWidth={1.5} className="text-white" />

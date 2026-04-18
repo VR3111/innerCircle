@@ -11,6 +11,7 @@ import PostDetail from "./screens/PostDetail";
 import Explore from "./screens/Explore";
 import Profile from "./screens/Profile";
 import Notifications from "./screens/Notifications";
+import Settings from "./screens/Settings";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 // Redirects to /auth when there is no session; shows a blank frame while loading.
@@ -62,6 +63,7 @@ export const router = createBrowserRouter([
           { path: "/explore",        Component: Explore,     ErrorBoundary },
           { path: "/profile",        Component: Profile,     ErrorBoundary },
           { path: "/notifications",  Component: Notifications, ErrorBoundary },
+          { path: "/settings",       Component: Settings,      ErrorBoundary },
         ],
       },
     ],

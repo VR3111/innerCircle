@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckCircle2, TrendingUp, Lock, ArrowRight, LogOut } from "lucide-react";
+import { ArrowLeft, CheckCircle2, TrendingUp, Lock, ArrowRight, LogOut, Settings } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import BottomNav from "../components/BottomNav";
 import { motion } from "motion/react";
@@ -54,13 +54,21 @@ export default function Profile() {
               <ArrowLeft size={20} strokeWidth={1.5} />
               <span className="font-['DM_Sans']">Back</span>
             </Link>
-            <button
-              onClick={handleSignOut}
-              className="flex items-center gap-2 px-3 py-2 text-white/50 hover:text-[#E63946] hover:bg-[#E63946]/8 active:scale-95 transition-all rounded-xl border border-white/8 hover:border-[#E63946]/20"
-            >
-              <LogOut size={16} strokeWidth={1.5} />
-              <span className="font-['DM_Sans'] text-xs font-medium">Sign out</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <Link
+                to="/settings"
+                className="p-2 text-white/40 hover:text-white hover:bg-white/5 active:scale-95 transition-all rounded-xl"
+              >
+                <Settings size={18} strokeWidth={1.5} />
+              </Link>
+              <button
+                onClick={handleSignOut}
+                className="flex items-center gap-2 px-3 py-2 text-white/50 hover:text-[#E63946] hover:bg-[#E63946]/8 active:scale-95 transition-all rounded-xl border border-white/8 hover:border-[#E63946]/20"
+              >
+                <LogOut size={16} strokeWidth={1.5} />
+                <span className="font-['DM_Sans'] text-xs font-medium">Sign out</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
