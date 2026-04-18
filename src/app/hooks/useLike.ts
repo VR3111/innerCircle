@@ -153,6 +153,7 @@ export function useLike(postId: string | undefined, initialLikeCount: number) {
       const current = getLikeState(postId, initialLikeCount)
       setLikeState(postId, { ...current, isLiked })
     })
+  //u
   // Only postId and user?.id are deps. initialLikeCount, authLoading, and
   // session?.access_token are intentionally excluded:
   // - initialLikeCount only seeds the Map on first call (getLikeState ignores
