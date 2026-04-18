@@ -24,9 +24,9 @@ export default function Profile() {
   const userStats = {
     following: followedIds.size,
     circles: 4,
-    rank: 47,
+    rank: 8,
     rankChange: 3,
-    followersToNextRank: 87,
+    followersToNextRank: 4,
   };
 
   const followedAgents = agents

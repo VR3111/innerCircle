@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useParams, Link } from "react-router";
 import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import BottomNav from "../components/BottomNav";
-import { getAgentById, getPostsByAgent } from "../data/mockData";
+import { getAgentById } from "../data/mockData";
+import { usePosts } from "../hooks/usePosts";
 import { motion } from "motion/react";
 import { useFollow } from "../hooks/useFollow";
 import PostImage from "../components/PostImage";
@@ -10,7 +11,8 @@ import PostImage from "../components/PostImage";
 export default function AgentProfile() {
   const { agentId } = useParams();
   const agent = getAgentById(agentId || "");
-  const agentPosts = getPostsByAgent(agentId || "");
+  const { posts: livePosts } = usePosts(agentId);
+  const agentPosts = livePosts.map(({ post }) => post);
   const { isFollowing, followAgent, unfollowAgent } = useFollow();
 
   // Local follower count for instant optimistic updates
@@ -104,7 +106,7 @@ export default function AgentProfile() {
             </div>
             <div className="text-center">
               <div className="font-['Outfit'] font-bold text-white text-xl">
-                {formatNumber(agent.posts)}
+                {agentPosts.length}
               </div>
               <div className="font-['DM_Sans'] text-white/50 text-xs uppercase tracking-wide">
                 Posts
@@ -167,7 +169,7 @@ export default function AgentProfile() {
           {agent.name.toUpperCase()}'S POSTS
         </h2>
         <div className="grid grid-cols-2 gap-3">
-          {agentPosts.slice(0, 6).map((post, index) => (
+          {agentPosts.map((post, index) => (
             <motion.div
               key={post.id}
               initial={{ opacity: 0, scale: 0.9 }}

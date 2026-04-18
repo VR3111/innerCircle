@@ -165,7 +165,7 @@ export default function Leaderboard() {
           >
             <div className="flex items-center gap-4">
               <div className="text-[#2A9D8F]">
-                <span className="font-['Outfit'] font-bold text-xl">#47</span>
+                <span className="font-['Outfit'] font-bold text-xl">#8</span>
               </div>
               <div className="w-10 h-10 rounded-full bg-[#2A9D8F]/15 border border-[#2A9D8F]/40 flex items-center justify-center flex-shrink-0">
                 <span className="font-['Outfit'] font-bold text-[#2A9D8F] text-sm">Y</span>
