@@ -61,7 +61,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })
 
-    return () => subscription.unsubscribe()
+    // Listen for the manual storage event dispatched by auth.ts signIn().
+    // supabase.auth.setSession() hangs due to the PKCE deadlock, so signIn()
+    // writes the session to localStorage then fires this event so we can
+    // update React state without going through the supabase client.
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key !== 'inner-circle-auth' || !e.newValue) return
+      try {
+        const parsed = JSON.parse(e.newValue)
+        if (parsed?.access_token) {
+          setSession(parsed as Session)
+          setUser((parsed.user as User) ?? null)
+          setLoading(false)
+          void ensureProfileIfNeeded(parsed as Session)
+        }
+      } catch {}
+    }
+
+    window.addEventListener('storage', handleStorage)
+
+    return () => {
+      subscription.unsubscribe()
+      window.removeEventListener('storage', handleStorage)
+    }
   }, [])
 
   /**
