@@ -1,12 +1,12 @@
-import { getSupabaseAdmin } from './lib/supabase-admin'
+import { getSupabaseAdmin } from './_lib/supabase-admin'
 import {
   AGENT_PROFILE_IDS,
   AGENT_NAMES,
   AGENT_REPLIES_PER_POST_LIMIT,
   AGENT_REPLIES_PER_USER_PER_POST_LIMIT,
   AGENT_REPLY_MAX_TOKENS,
-} from './agents/constants'
-import { AGENT_PROMPTS } from './agents/prompts'
+} from './_agents/constants'
+import { AGENT_PROMPTS } from './_agents/prompts'
 
 // Give Claude + web search enough runway. Vercel Hobby cap is 60s.
 export const config = { maxDuration: 45 }
@@ -112,7 +112,7 @@ function sanitizeReply(text: string): string {
 }
 
 // ── Claude API call ────────────────────────────────────────────
-// Uses raw fetch consistent with api/lib/claude.ts.
+// Uses raw fetch consistent with api/_lib/claude.ts.
 // Web search (web_search_20250305) is a server-side Anthropic-hosted
 // tool — Anthropic executes searches internally; we do not need to
 // implement a tool loop. The response arrives with stop_reason: 'end_turn'
