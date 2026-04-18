@@ -184,7 +184,7 @@ export default function PostDetail() {
   const { isFollowing, followAgent, unfollowAgent } = useFollow();
   const { innerCircleReplies, generalReplies, loading: repliesLoading, addReply } = useReplies(postWithAgent?.post.id);
 
-  const [activeTab, setActiveTab] = useState<Tab>("inner");
+  const [activeTab, setActiveTab] = useState<Tab>("everyone");
   const [replyText, setReplyText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const replyInputRef = useRef<HTMLInputElement>(null);
@@ -246,8 +246,7 @@ export default function PostDetail() {
     const text = replyText.trim();
     if (!text || isSubmitting) return;
     setIsSubmitting(true);
-    setReplyText("");          // clear immediately so the field feels responsive
-    setActiveTab("everyone");  // switch tab so the optimistic reply is visible
+    setReplyText("");
     const ok = await addReply(text);
     if (!ok) {
       toast.error("Failed to post reply");
@@ -566,7 +565,7 @@ export default function PostDetail() {
                 />
                 <motion.button
                   type="submit"
-                  disabled={!replyText.trim() || isSubmitting}
+                  disabled={isSubmitting}
                   whileTap={{ scale: 0.88 }}
                   transition={{ type: "spring", stiffness: 400, damping: 17 }}
                   className="flex-shrink-0 transition-opacity disabled:opacity-30"

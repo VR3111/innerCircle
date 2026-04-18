@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react'
-import { supabase } from '../../lib/supabase'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 
 export interface Reply {
@@ -36,86 +35,86 @@ function mapRow(row: any): Reply {
 }
 
 export function useReplies(postId: string | undefined) {
-  const { user } = useAuth()
+  const { user, session } = useAuth()
   const [replies, setReplies] = useState<Reply[]>([])
   const [loading, setLoading] = useState(true)
+  const abortRef = useRef<AbortController | null>(null)
+
+  const loadReplies = useCallback(async (targetPostId: string) => {
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    setLoading(true)
+
+    try {
+      const url = new URL(`${SUPABASE_URL}/rest/v1/replies`)
+      url.searchParams.set('select', '*,profiles(username)')
+      url.searchParams.set('post_id', `eq.${targetPostId}`)
+      url.searchParams.set('order', 'created_at.asc')
+
+      const res = await fetch(url.toString(), {
+        signal: controller.signal,
+        cache: 'no-store',
+        headers: {
+          'apikey':        SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type':  'application/json',
+        },
+      })
+
+      if (!res.ok) return
+
+      const data = await res.json() as any[]
+      setReplies((data ?? []).map(mapRow))
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return
+      // silently ignore other errors — empty list is the fallback
+    } finally {
+      if (!controller.signal.aborted) {
+        setLoading(false)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (!postId) {
+      abortRef.current?.abort()
+      setReplies([])
       setLoading(false)
       return
     }
 
-    let cancelled = false
-
-    async function load() {
-      setLoading(true)
-      try {
-        const url = new URL(`${SUPABASE_URL}/rest/v1/replies`)
-        url.searchParams.set('select', '*,profiles(username)')
-        url.searchParams.set('post_id', `eq.${postId}`)
-        url.searchParams.set('order', 'created_at.asc')
-
-        const res = await fetch(url.toString(), {
-          headers: {
-            'apikey':        SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-            'Content-Type':  'application/json',
-          },
-        })
-
-        if (cancelled) return
-
-        if (res.ok) {
-          const data = await res.json() as any[]
-          if (!cancelled) setReplies((data ?? []).map(mapRow))
-        }
-      } catch {
-        // silently ignore — empty list is the fallback
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    load()
-    return () => { cancelled = true }
-  }, [postId])
+    void loadReplies(postId)
+  }, [postId, loadReplies])
 
   const addReply = async (content: string): Promise<boolean> => {
-    if (!user || !postId || !content.trim()) return false
+    const trimmed = content.trim()
 
-    // Optimistic add
-    const optimistic: Reply = {
-      id:            `optimistic-${Date.now()}`,
-      userId:        user.id,
-      username:      user.user_metadata?.username ?? user.email?.split('@')[0] ?? 'You',
-      content:       content.trim(),
-      isInnerCircle: false,
-      isAgentReply:  false,
-      timestamp:     'just now',
-    }
+    if (!user || !session?.access_token || !postId || !trimmed) return false
 
-    setReplies(prev => [...prev, optimistic])
-
-    // Only check the INSERT result — don't chain .select().single() because a
-    // missing profile row or join edge-case would make that fail with an error
-    // even when the INSERT itself succeeded, causing addReply() to return false.
-    const { error } = await supabase
-      .from('replies')
-      .insert({
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/replies`, {
+      method: 'POST',
+      headers: {
+        'apikey':        SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type':  'application/json',
+        'Prefer':        'return=minimal',
+      },
+      body: JSON.stringify({
         user_id:         user.id,
         post_id:         postId,
-        content:         content.trim(),
+        content:         trimmed,
         is_inner_circle: false,
-      })
+      }),
+    })
 
-    if (error) {
-      setReplies(prev => prev.filter(r => r.id !== optimistic.id))
+    if (!res.ok) {
+      console.error('[addReply] POST failed', res.status, await res.text())
       return false
     }
 
-    // INSERT succeeded — leave the optimistic reply in place (it already shows
-    // the correct username/content/timestamp).
+    await loadReplies(postId)
     return true
   }
 

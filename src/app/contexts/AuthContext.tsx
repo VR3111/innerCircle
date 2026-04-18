@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
+import { ensureProfile } from '../../lib/profiles'
 
 interface AuthContextType {
   user: User | null
@@ -23,11 +24,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    const ensureProfileIfNeeded = async (session: Session | null) => {
+      if (!session?.user) return
+
+      try {
+        await ensureProfile(session.user)
+      } catch (err) {
+        console.warn('[Inner Circle] ensureProfile failed:', err)
+      }
+    }
+
     supabase.auth
       .getSession()
       .then(({ data: { session } }) => {
         setSession(session)
         setUser(session?.user ?? null)
+        void ensureProfileIfNeeded(session)
       })
       .catch((err) => {
         console.warn('[Inner Circle] getSession failed:', err)
@@ -43,26 +55,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null)
       setLoading(false)
 
-      // Auto-create profile row on first sign-in
+      // Auto-create or backfill the profile row whenever we get a usable session.
       if (event === 'SIGNED_IN' && session?.user) {
-        try {
-          const { data: existing } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('id', session.user.id)
-            .single()
-
-          if (!existing) {
-            const username =
-              session.user.user_metadata?.username ||
-              session.user.email?.split('@')[0] ||
-              'user'
-            // Silently fails if INSERT policy is not yet applied — see migration 002
-            await supabase.from('profiles').insert({ id: session.user.id, username })
-          }
-        } catch (_err) {
-          // Silently ignore — profile row creation is best-effort
-        }
+        await ensureProfileIfNeeded(session)
       }
     })
 

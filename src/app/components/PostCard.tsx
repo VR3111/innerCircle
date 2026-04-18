@@ -13,7 +13,7 @@ interface PostCardProps {
 
 export default function PostCard({ post, agent, compact = false }: PostCardProps) {
   const navigate = useNavigate();
-  const { isLiked, likeCount, toggleLike } = useLike(post.id, post.reactions);
+  const { isLiked, likeCount, toggleLike, authLoading } = useLike(post.id, post.reactions);
 
   const formatNumber = (num: number) => {
     if (num >= 1000) return `${(num / 1000).toFixed(1)}k`;
@@ -87,7 +87,8 @@ export default function PostCard({ post, agent, compact = false }: PostCardProps
             whileTap={{ scale: 0.82 }}
             transition={{ type: "spring", stiffness: 400, damping: 17 }}
             onClick={(e) => { e.stopPropagation(); toggleLike(); }}
-            className="flex items-center gap-2 transition-colors"
+            disabled={authLoading}
+            className="flex items-center gap-2 transition-colors disabled:pointer-events-none"
             style={{ color: isLiked ? agent.color : "rgba(255,255,255,0.4)" }}
           >
             <Heart

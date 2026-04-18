@@ -1,15 +1,5 @@
 export type Database = {
   public: {
-    Functions: {
-      get_email_by_username: {
-        Args: { p_username: string }
-        Returns: string
-      }
-      adjust_agent_followers: {
-        Args: { p_agent_id: string; p_delta: number }
-        Returns: undefined
-      }
-    }
     Tables: {
       profiles: {
         Row: {
@@ -39,6 +29,7 @@ export type Database = {
           circles_count?: number
           created_at?: string
         }
+        Relationships: []
       }
 
       agents: {
@@ -75,6 +66,7 @@ export type Database = {
           rank?: number
           is_official?: boolean
         }
+        Relationships: []
       }
 
       posts: {
@@ -111,6 +103,15 @@ export type Database = {
           shares?: number
           created_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: 'posts_agent_id_fkey'
+            columns: ['agent_id']
+            isOneToOne: false
+            referencedRelation: 'agents'
+            referencedColumns: ['id']
+          }
+        ]
       }
 
       follows: {
@@ -132,6 +133,22 @@ export type Database = {
           agent_id?: string
           created_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: 'follows_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'follows_agent_id_fkey'
+            columns: ['agent_id']
+            isOneToOne: false
+            referencedRelation: 'agents'
+            referencedColumns: ['id']
+          }
+        ]
       }
 
       inner_circle: {
@@ -153,6 +170,22 @@ export type Database = {
           agent_id?: string
           created_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: 'inner_circle_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inner_circle_agent_id_fkey'
+            columns: ['agent_id']
+            isOneToOne: false
+            referencedRelation: 'agents'
+            referencedColumns: ['id']
+          }
+        ]
       }
 
       replies: {
@@ -183,6 +216,59 @@ export type Database = {
           is_agent_reply?: boolean
           created_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: 'replies_post_id_fkey'
+            columns: ['post_id']
+            isOneToOne: false
+            referencedRelation: 'posts'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'replies_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+
+      post_likes: {
+        Row: {
+          id: string               // uuid
+          post_id: string          // → posts.id
+          user_id: string          // → profiles.id
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          post_id: string
+          user_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          post_id?: string
+          user_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'post_likes_post_id_fkey'
+            columns: ['post_id']
+            isOneToOne: false
+            referencedRelation: 'posts'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'post_likes_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          }
+        ]
       }
 
       notifications: {
@@ -213,7 +299,43 @@ export type Database = {
           is_read?: boolean
           created_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: 'notifications_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          }
+        ]
       }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      get_email_by_username: {
+        Args: { p_username: string }
+        Returns: string
+      }
+      adjust_agent_followers: {
+        Args: { p_agent_id: string; p_delta: number }
+        Returns: undefined
+      }
+      increment_likes: {
+        Args: { post_id: string }
+        Returns: undefined
+      }
+      decrement_likes: {
+        Args: { post_id: string }
+        Returns: undefined
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
     }
   }
 }
