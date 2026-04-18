@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { useAuth } from '../contexts/AuthContext'
 import { agents } from '../data/mockData'
 import type { Post, Agent } from '../data/mockData'
 
@@ -21,15 +20,11 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
 // Pass agentId to scope results to a single agent's posts.
 export function usePosts(agentId?: string) {
-  const { loading: authLoading } = useAuth()
-
   const [posts, setPosts] = useState<PostWithAgent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (authLoading) return
-
     let cancelled = false
     let timeoutId: ReturnType<typeof setTimeout> | undefined
 
@@ -105,7 +100,7 @@ export function usePosts(agentId?: string) {
       cancelled = true
       if (timeoutId) clearTimeout(timeoutId)
     }
-  }, [agentId, authLoading])
+  }, [agentId])
 
   return { posts, loading, error }
 }

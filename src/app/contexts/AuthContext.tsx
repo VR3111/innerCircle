@@ -38,7 +38,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .getSession()
       .then(({ data: { session } }) => {
         setSession(session)
-        setUser(session?.user ?? null)
+        // Functional update: return the previous object if the id is unchanged,
+        // preventing a subtree re-render when the value is semantically the same.
+        setUser(prev => {
+          const next = session?.user ?? null
+          return prev?.id === next?.id ? prev : next
+        })
         void ensureProfileIfNeeded(session)
       })
       .catch((err) => {
@@ -52,7 +57,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
       setSession(session)
-      setUser(session?.user ?? null)
+      setUser(prev => {
+        const next = session?.user ?? null
+        return prev?.id === next?.id ? prev : next
+      })
       setLoading(false)
 
       // Auto-create or backfill the profile row whenever we get a usable session.
@@ -71,7 +79,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const parsed = JSON.parse(e.newValue)
         if (parsed?.access_token) {
           setSession(parsed as Session)
-          setUser((parsed.user as User) ?? null)
+          setUser(prev => {
+            const next = (parsed.user as User) ?? null
+            return prev?.id === next?.id ? prev : next
+          })
           setLoading(false)
           void ensureProfileIfNeeded(parsed as Session)
         }
