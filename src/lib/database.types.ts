@@ -196,6 +196,8 @@ export type Database = {
           content: string
           is_inner_circle: boolean
           is_agent_reply: boolean
+          is_pinned: boolean       // added migration 009
+          parent_reply_id: string | null  // added migration 009
           created_at: string
         }
         Insert: {
@@ -205,6 +207,8 @@ export type Database = {
           content: string
           is_inner_circle?: boolean
           is_agent_reply?: boolean
+          is_pinned?: boolean
+          parent_reply_id?: string | null
           created_at?: string
         }
         Update: {
@@ -214,6 +218,8 @@ export type Database = {
           content?: string
           is_inner_circle?: boolean
           is_agent_reply?: boolean
+          is_pinned?: boolean
+          parent_reply_id?: string | null
           created_at?: string
         }
         Relationships: [
