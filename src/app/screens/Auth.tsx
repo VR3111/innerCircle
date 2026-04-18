@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router'
 import { motion, AnimatePresence } from 'motion/react'
 import { Eye, EyeOff } from 'lucide-react'
-import { signIn, signUp } from '../../lib/auth'
+import { signIn, signUp, resetPassword } from '../../lib/auth'
 import { useAuth } from '../contexts/AuthContext'
 
-type Mode = 'signin' | 'signup'
+type Mode = 'signin' | 'signup' | 'forgot_password'
 
 export default function Auth() {
   const navigate = useNavigate()
@@ -21,6 +21,11 @@ export default function Auth() {
   const [submitting, setSubmitting] = useState(false)
   // Set to the email address when Supabase requires confirmation before sign-in
   const [confirmationEmail, setConfirmationEmail] = useState('')
+  // Forgot-password flow
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [resetSentTo, setResetSentTo] = useState('')
+  const [resetSubmitting, setResetSubmitting] = useState(false)
+  const [resetError, setResetError] = useState('')
 
   // Already logged in — skip to the right place
   useEffect(() => {
@@ -50,6 +55,23 @@ export default function Auth() {
     setEmailOrUsername('')
     setPassword('')
     setUsername('')
+    setForgotEmail('')
+    setResetSentTo('')
+    setResetError('')
+  }
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setResetError('')
+    setResetSubmitting(true)
+    try {
+      await resetPassword(forgotEmail.trim())
+      setResetSentTo(forgotEmail.trim())
+    } catch (err: unknown) {
+      setResetError(err instanceof Error ? err.message : 'Something went wrong')
+    } finally {
+      setResetSubmitting(false)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -97,6 +119,145 @@ export default function Auth() {
   }
 
   if (loading) return null
+
+  // ── Reset email sent ──────────────────────────────────────────────────────
+  if (resetSentTo) {
+    return (
+      <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center px-6">
+        <motion.div
+          initial={{ scale: 0.85, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+          className="w-full max-w-[380px] text-center"
+        >
+          <div className="w-20 h-20 rounded-full bg-[#2A9D8F]/15 border-2 border-[#2A9D8F]/40 flex items-center justify-center mx-auto mb-6">
+            <span className="font-['Outfit'] font-extrabold text-[#2A9D8F] text-3xl leading-none">
+              ✉
+            </span>
+          </div>
+
+          <h1 className="font-['Unbounded'] font-bold text-white text-xl leading-snug mb-3">
+            Check your inbox
+          </h1>
+
+          <p className="font-['DM_Sans'] text-white/50 text-sm leading-relaxed mb-2">
+            We sent a password reset link to
+          </p>
+          <p className="font-['DM_Sans'] text-white/80 text-sm font-semibold mb-8">
+            {resetSentTo}
+          </p>
+
+          <p className="font-['DM_Sans'] text-white/30 text-xs leading-relaxed mb-8">
+            Click the link in the email to set a new password.
+          </p>
+
+          <button
+            onClick={() => switchMode('signin')}
+            className="w-full py-4 rounded-2xl bg-white text-black font-['Outfit'] font-bold text-base tracking-wide hover:bg-white/90 active:scale-[0.98] transition-all"
+          >
+            Back to Sign In
+          </button>
+        </motion.div>
+      </div>
+    )
+  }
+
+  // ── Forgot password form ──────────────────────────────────────────────────
+  if (mode === 'forgot_password') {
+    return (
+      <div className="min-h-screen bg-[#0A0A0A] flex flex-col">
+        <div className="flex-1 flex items-center justify-center px-6 py-12">
+          <div className="w-full max-w-[380px]">
+
+            <motion.div
+              initial={{ scale: 0.7, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+              className="text-center mb-12"
+            >
+              <div
+                className="font-['Unbounded'] font-bold text-white leading-none mb-3"
+                style={{ fontSize: 'clamp(56px, 15vw, 72px)' }}
+              >
+                ◈
+              </div>
+              <div className="font-['Unbounded'] font-bold text-white text-[10px] tracking-[0.22em] opacity-60">
+                SOCIAL LEVELING
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="mb-6"
+            >
+              <h2 className="font-['Unbounded'] font-bold text-white text-base mb-1.5">
+                Reset password
+              </h2>
+              <p className="font-['DM_Sans'] text-white/40 text-sm">
+                Enter your email and we'll send a reset link.
+              </p>
+            </motion.div>
+
+            <motion.form
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              onSubmit={handleForgotPassword}
+              className="space-y-3"
+            >
+              <input
+                type="email"
+                placeholder="Email"
+                value={forgotEmail}
+                onChange={(e) => setForgotEmail(e.target.value)}
+                autoComplete="email"
+                required
+                autoFocus
+                className="w-full bg-[#111111] border border-white/8 rounded-xl px-4 py-3.5 text-white font-['DM_Sans'] text-[15px] placeholder:text-white/25 focus:outline-none focus:border-white/25 transition-colors"
+              />
+
+              <AnimatePresence>
+                {resetError && (
+                  <motion.p
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    className="font-['DM_Sans'] text-[#E63946] text-sm text-center pt-1"
+                  >
+                    {resetError}
+                  </motion.p>
+                )}
+              </AnimatePresence>
+
+              <button
+                type="submit"
+                disabled={resetSubmitting}
+                className="w-full py-4 rounded-2xl bg-white text-black font-['Outfit'] font-bold text-base tracking-wide hover:bg-white/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-1"
+              >
+                {resetSubmitting ? 'Sending…' : 'Send reset link'}
+              </button>
+            </motion.form>
+
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="text-center font-['DM_Sans'] text-white/20 text-xs mt-6"
+            >
+              <button
+                onClick={() => switchMode('signin')}
+                className="text-white/40 hover:text-white/70 underline underline-offset-2 transition-colors"
+              >
+                Back to sign in
+              </button>
+            </motion.p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   // ── Email confirmation pending ────────────────────────────────────────────
   if (confirmationEmail) {
@@ -277,6 +438,19 @@ export default function Auth() {
                 ? mode === 'signup' ? 'Creating account…' : 'Signing in…'
                 : mode === 'signup' ? 'Create Account' : 'Sign In'}
             </button>
+
+            {/* Forgot password — sign in only */}
+            {mode === 'signin' && (
+              <div className="text-center pt-1">
+                <button
+                  type="button"
+                  onClick={() => switchMode('forgot_password')}
+                  className="font-['DM_Sans'] text-white/30 text-xs hover:text-white/60 underline underline-offset-2 transition-colors"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
           </motion.form>
 
           {/* Mode switch link */}

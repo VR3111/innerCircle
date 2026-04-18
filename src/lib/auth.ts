@@ -112,6 +112,47 @@ export async function signOut() {
 }
 
 /**
+ * Sends a password reset email via Supabase's /auth/v1/recover endpoint.
+ * Uses raw fetch — supabase client hangs on PKCE-related calls.
+ */
+export async function resetPassword(email: string) {
+  const redirectTo = `${window.location.origin}/reset-password`
+  const url = `${SUPABASE_URL}/auth/v1/recover?redirect_to=${encodeURIComponent(redirectTo)}`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: BASE_HEADERS,
+    body: JSON.stringify({ email }),
+  })
+
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data?.msg ?? data?.message ?? 'Failed to send reset email')
+  }
+  return data
+}
+
+/**
+ * Updates the authenticated user's password using the access token from the
+ * reset email link. Called from the /reset-password screen.
+ */
+export async function updatePassword(newPassword: string, accessToken: string) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    method: 'PUT',
+    headers: {
+      ...BASE_HEADERS,
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ password: newPassword }),
+  })
+
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data?.msg ?? data?.message ?? 'Failed to update password')
+  }
+  return data
+}
+
+/**
  * Returns the locally cached user without a network round-trip.
  * Reads from the same localStorage key that supabase-js writes to.
  */

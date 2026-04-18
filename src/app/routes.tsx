@@ -12,6 +12,7 @@ import Explore from "./screens/Explore";
 import Profile from "./screens/Profile";
 import Notifications from "./screens/Notifications";
 import Settings from "./screens/Settings";
+import ResetPassword from "./screens/ResetPassword";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 // Redirects to /auth when there is no session; shows a blank frame while loading.
@@ -41,8 +42,9 @@ function RequireAuth() {
 }
 
 export const router = createBrowserRouter([
-  // Public — auth screen
-  { path: "/auth", Component: Auth, ErrorBoundary },
+  // Public routes — no session required
+  { path: "/auth",           Component: Auth,          ErrorBoundary },
+  { path: "/reset-password", Component: ResetPassword, ErrorBoundary },
 
   // Everything else requires a session
   {

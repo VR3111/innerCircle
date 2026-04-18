@@ -5,6 +5,7 @@ import { motion } from "motion/react";
 import BottomNav from "../components/BottomNav";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../../lib/supabase";
+import { resetPassword } from "../../lib/auth";
 import { toast } from "sonner";
 
 const APP_VERSION = "1.0.0";
@@ -48,12 +49,13 @@ export default function Settings() {
   const handlePasswordReset = async () => {
     if (!user?.email) return;
     setSendingReset(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(user.email);
-    setSendingReset(false);
-    if (error) {
-      toast.error("Failed to send reset email");
-    } else {
-      toast.success("Password reset email sent");
+    try {
+      await resetPassword(user.email);
+      toast.success(`Reset link sent to ${user.email}`);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to send reset email");
+    } finally {
+      setSendingReset(false);
     }
   };
 
