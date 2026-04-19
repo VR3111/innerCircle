@@ -74,7 +74,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // writes the session to localStorage then fires this event so we can
     // update React state without going through the supabase client.
     const handleStorage = (e: StorageEvent) => {
-      if (e.key !== 'inner-circle-auth' || !e.newValue) return
+      if (e.key !== 'inner-circle-auth') return
+      if (!e.newValue) {
+        setSession(null)
+        setUser(null)
+        setLoading(false)
+        return
+      }
       try {
         const parsed = JSON.parse(e.newValue)
         if (parsed?.access_token) {

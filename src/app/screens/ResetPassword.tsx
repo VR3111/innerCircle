@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router'
 import { motion, AnimatePresence } from 'motion/react'
 import { Eye, EyeOff } from 'lucide-react'
@@ -10,6 +10,37 @@ export default function ResetPassword() {
 
   const hashParams = new URLSearchParams(window.location.hash.substring(1))
   const accessToken = hashParams.get('access_token')
+  const type = hashParams.get('type')
+
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    const hashParams = new URLSearchParams(window.location.hash.substring(1))
+    const token = hashParams.get('access_token')
+    const type = hashParams.get('type')
+
+    // No recovery token — let the "Invalid link" UI render as-is.
+    if (!token || type !== 'recovery') {
+      setReady(true)
+      return
+    }
+
+    // Force-clear any stale session before the recovery token is used.
+    // This prevents the cached user from "winning" over the recovery account.
+    localStorage.removeItem('inner-circle-auth')
+    localStorage.removeItem('onboarded')
+
+    // Notify AuthContext via storage event (same pattern auth.ts uses for
+    // sign-in, but in reverse — newValue: null triggers the sign-out branch).
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: 'inner-circle-auth',
+        newValue: null,
+      })
+    )
+
+    setReady(true)
+  }, [])
 
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -18,8 +49,10 @@ export default function ResetPassword() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  // No token in URL — the link is broken or already used
-  if (!accessToken) {
+  if (!ready) return null
+
+  // No token in URL or wrong type — the link is broken or already used
+  if (!accessToken || type !== 'recovery') {
     return (
       <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center px-6">
         <div className="w-full max-w-[380px] text-center">

@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+const isCapacitorBuild = process.env.CAPACITOR_BUILD === 'true'
 
 function figmaAssetResolver() {
   return {
@@ -24,7 +25,7 @@ export default defineConfig({
     // Tailwind is not being actively used – do not remove them
     react(),
     tailwindcss(),
-    VitePWA({
+    ...(isCapacitorBuild ? [] : [VitePWA({
       registerType: 'autoUpdate',
       // Service worker is compiled and output to dist/ at build time
       injectRegister: 'auto',
@@ -82,7 +83,7 @@ export default defineConfig({
           },
         ],
       },
-    }),
+    })]),
   ],
   resolve: {
     alias: {

@@ -19,3 +19,8 @@ vite.config.ts.timestamp-*
 
 # Supabase
 supabase/.temp/
+
+# Capacitor iOS — generated native project (regenerated via npx cap add ios)
+ios/App/Pods/
+ios/App/App.xcworkspace/xcuserdata/
+ios/.DS_Store

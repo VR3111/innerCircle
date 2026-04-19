@@ -65,8 +65,9 @@ export default function Auth() {
     setResetError('')
     setResetSubmitting(true)
     try {
-      await resetPassword(forgotEmail.trim())
-      setResetSentTo(forgotEmail.trim())
+      const normalized = forgotEmail.trim().toLowerCase()
+      await resetPassword(normalized)
+      setResetSentTo(normalized)
     } catch (err: unknown) {
       setResetError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
@@ -85,19 +86,25 @@ export default function Auth() {
 
     setSubmitting(true)
     try {
+      // Only lowercase if it's an email (contains @). Usernames are case-sensitive
+      // per the get_email_by_username RPC behavior.
+      const normalized = emailOrUsername.includes('@')
+        ? emailOrUsername.trim().toLowerCase()
+        : emailOrUsername.trim()
+
       if (mode === 'signup') {
-        const data = await signUp(emailOrUsername, password, username.trim())
+        const data = await signUp(normalized, password, username.trim())
         if (!data.session) {
           // Supabase returned no session — email confirmation is required before
           // the account is active. Show the confirmation screen.
-          setConfirmationEmail(emailOrUsername)
+          setConfirmationEmail(normalized)
           return
         }
         // Mark as new user so onboarding runs; cleared to null on sign-out
         localStorage.setItem('onboarded', 'false')
         navigate('/', { replace: true })
       } else {
-        const data = await signIn(emailOrUsername, password)
+        const data = await signIn(normalized, password)
         const onboarded = localStorage.getItem('onboarded')
         if (onboarded === 'true') {
           navigate('/home', { replace: true })
@@ -213,6 +220,10 @@ export default function Auth() {
                 value={forgotEmail}
                 onChange={(e) => setForgotEmail(e.target.value)}
                 autoComplete="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                inputMode="email"
                 required
                 autoFocus
                 className="w-full bg-[#111111] border border-white/8 rounded-xl px-4 py-3.5 text-white font-['DM_Sans'] text-[15px] placeholder:text-white/25 focus:outline-none focus:border-white/25 transition-colors"
@@ -390,6 +401,10 @@ export default function Auth() {
               value={emailOrUsername}
               onChange={(e) => setEmailOrUsername(e.target.value)}
               autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              inputMode="email"
               required
               className="w-full bg-[#111111] border border-white/8 rounded-xl px-4 py-3.5 text-white font-['DM_Sans'] text-[15px] placeholder:text-white/25 focus:outline-none focus:border-white/25 transition-colors"
             />
