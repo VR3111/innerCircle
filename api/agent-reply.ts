@@ -42,7 +42,7 @@ interface AgentReplyRequest {
 
 interface AgentReplyResponse {
   success:       true
-  replyId:       string
+  replyId?:      string   // absent on ephemeral cap-hit responses (per_user)
   replyContent:  string
   isCapHit:      boolean
   isPinned:      boolean
@@ -61,6 +61,17 @@ const FALLBACK_REPLIES: Record<string, string> = {
   reel:    'Something interrupted my train of thought. The drama continues without me for a moment.',
   pulse:   'Technical fault. Come back and we will pick this up.',
   atlas:   'A communications failure. The situation continues to develop.',
+}
+
+// Used for per-user cap-hit responses (ephemeral, toast-only on frontend).
+// No DB insert and no Claude call — returned directly to the client.
+const FALLBACK_CAP_HIT_MESSAGES: Record<string, string> = {
+  baron:   "You've asked enough today. The market moves on without you.",
+  blitz:   "Final whistle on our chat for now. Catch me on the next post.",
+  circuit: "Rate limited. Tag me on another thread if you want more.",
+  reel:    "That's a wrap on this scene. Come find me somewhere else.",
+  pulse:   "Recovery time. Come back when you've earned another set.",
+  atlas:   "I've said my piece here. Take this elsewhere.",
 }
 
 // ── Auth validation ────────────────────────────────────────────
@@ -520,21 +531,12 @@ export default async function handler(req: any, res: any) {
       } as AgentReplyResponse)
     }
 
-    // ── 12b. Per-user cap hit ──────────────────────────────────
+    // ── 12b. Per-user cap hit (ephemeral — no DB insert, no Claude call) ──
+    // Private signal to this user only; no row is written to replies.
     if (userCount >= AGENT_REPLIES_PER_USER_PER_POST_LIMIT) {
-      const capText = await callClaude(taggedAgent!, 'cap_hit')
-      const row     = await insertAgentReply({
-        postId:      postId!,
-        userReplyId: userReplyId!,
-        agentName:   taggedAgent!,
-        content:     capText,
-        isPinned:    false,
-      })
-      await incrementTodaySpendCents(2)
       return res.status(200).json({
         success:      true,
-        replyId:      row.id,
-        replyContent: capText,
+        replyContent: FALLBACK_CAP_HIT_MESSAGES[taggedAgent!] ?? "You've chatted enough here.",
         isCapHit:     true,
         isPinned:     false,
         capHitReason: 'per_user',
