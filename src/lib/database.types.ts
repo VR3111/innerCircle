@@ -277,6 +277,28 @@ export type Database = {
         ]
       }
 
+      daily_spend: {
+        Row: {
+          date:                 string   // DATE stored as 'YYYY-MM-DD'
+          agent_reply_count:    number
+          estimated_cost_cents: number
+          updated_at:           string
+        }
+        Insert: {
+          date:                  string
+          agent_reply_count?:    number
+          estimated_cost_cents?: number
+          updated_at?:           string
+        }
+        Update: {
+          date?:                 string
+          agent_reply_count?:    number
+          estimated_cost_cents?: number
+          updated_at?:           string
+        }
+        Relationships: []
+      }
+
       notifications: {
         Row: {
           id: string               // uuid
@@ -334,6 +356,10 @@ export type Database = {
       }
       decrement_likes: {
         Args: { post_id: string }
+        Returns: undefined
+      }
+      increment_daily_spend: {
+        Args: { p_date: string; p_cents: number }
         Returns: undefined
       }
     }

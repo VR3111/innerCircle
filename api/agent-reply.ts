@@ -1,3 +1,17 @@
+// ── Cost-safety env vars ───────────────────────────────────────
+//
+//   AGENT_REPLIES_ENABLED=true                  Master kill switch.
+//                                               Set to 'false' to disable all agent replies.
+//                                               Defaults to enabled when missing.
+//
+//   AGENT_REPLIES_DAILY_COST_LIMIT_CENTS=2000   Hard daily spend ceiling in cents ($20.00).
+//                                               Resets at UTC midnight via the daily_spend table.
+//                                               Defaults to 2000 when missing.
+//
+//   AGENT_REPLIES_PER_USER_DAILY_CAP=20         Max agent replies a single user can receive
+//                                               across all agents in any rolling 24-hour window.
+//                                               Defaults to 20 when missing.
+
 import { getSupabaseAdmin } from './_lib/supabase-admin'
 import {
   AGENT_PROFILE_IDS,
@@ -287,6 +301,58 @@ async function insertAgentReply(params: {
   return data
 }
 
+// ── Daily spend helpers ────────────────────────────────────────
+
+// Returns today's estimated spend in cents (UTC day boundary).
+async function getTodaySpendCents(): Promise<number> {
+  const today = new Date().toISOString().split('T')[0]  // 'YYYY-MM-DD' UTC
+  const { data } = await getSupabaseAdmin()
+    .from('daily_spend')
+    .select('estimated_cost_cents')
+    .eq('date', today)
+    .maybeSingle()
+  return data?.estimated_cost_cents ?? 0
+}
+
+// Atomically increments both reply count and cost for today.
+// Uses the increment_daily_spend Postgres function (migration 011)
+// to avoid a read-modify-write race under concurrent requests.
+async function incrementTodaySpendCents(cents: number): Promise<void> {
+  const today = new Date().toISOString().split('T')[0]
+  await getSupabaseAdmin().rpc('increment_daily_spend', {
+    p_date:  today,
+    p_cents: cents,
+  })
+}
+
+// ── Per-user rolling-24h cap helper ───────────────────────────
+
+// Counts how many agent replies this user has received across all agents
+// in the last 24 hours (rolling window, not UTC-day-reset).
+async function countUserAgentRepliesLast24h(userId: string): Promise<number> {
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
+  // Step 1: find the user's own replies in the last 24h
+  const { data: userReplies } = await getSupabaseAdmin()
+    .from('replies')
+    .select('id')
+    .eq('user_id',        userId)
+    .eq('is_agent_reply', false)
+    .gte('created_at',    cutoff)
+
+  if (!userReplies || userReplies.length === 0) return 0
+
+  // Step 2: count agent replies whose parent is one of those reply IDs
+  const ids = userReplies.map(r => r.id)
+  const { count } = await getSupabaseAdmin()
+    .from('replies')
+    .select('id', { count: 'exact', head: true })
+    .eq('is_agent_reply', true)
+    .in('parent_reply_id', ids)
+
+  return count ?? 0
+}
+
 // ── Handler ────────────────────────────────────────────────────
 
 export default async function handler(req: any, res: any) {
@@ -294,15 +360,25 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
+  // ── 1. Kill switch — cheapest possible check, no DB or auth ──
+  // Explicit 'false' string only; missing var defaults to enabled.
+  if (process.env.AGENT_REPLIES_ENABLED === 'false') {
+    return res.status(200).json({
+      error:        'Agent replies temporarily unavailable. Try again shortly.',
+      isCapHit:     true,
+      capHitReason: 'service_disabled',
+    })
+  }
+
   try {
-    // ── 1. Extract Bearer token ────────────────────────────────
+    // ── 2. Extract Bearer token ────────────────────────────────
     const authHeader = ((req.headers['authorization'] ?? '') as string).trim()
     const token      = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : ''
     if (!token) {
       return res.status(401).json({ error: 'Missing authorization token' })
     }
 
-    // ── 2. Parse & validate request body ──────────────────────
+    // ── 3. Parse & validate request body ──────────────────────
     const body = (req.body ?? {}) as Partial<AgentReplyRequest>
     const {
       postId,
@@ -323,12 +399,12 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` })
     }
 
-    // ── 3. Validate agent name ─────────────────────────────────
+    // ── 4. Validate agent name ─────────────────────────────────
     if (!(AGENT_NAMES as readonly string[]).includes(taggedAgent!)) {
       return res.status(422).json({ error: `Unknown agent: ${taggedAgent}. Must be one of: ${AGENT_NAMES.join(', ')}` })
     }
 
-    // ── 4. Validate env vars early ─────────────────────────────
+    // ── 5. Validate env vars early ─────────────────────────────
     const missing_env = [
       'VITE_SUPABASE_URL',
       'VITE_SUPABASE_ANON_KEY',
@@ -340,13 +416,13 @@ export default async function handler(req: any, res: any) {
       return res.status(500).json({ error: 'Server misconfiguration' })
     }
 
-    // ── 5. Validate auth token (costs money if skipped) ───────
+    // ── 6. Validate auth token (costs money if skipped) ───────
     const authed = await validateAuth(token, userId!)
     if (!authed) {
       return res.status(401).json({ error: 'Invalid or expired authorization token' })
     }
 
-    // ── 6. Idempotency — already replied to this user reply? ──
+    // ── 7. Idempotency — already replied to this user reply? ──
     const existingReply = await findExistingAgentReplyFor(userReplyId!)
     if (existingReply) {
       console.log(`[agent-reply] Idempotent return for userReplyId=${userReplyId}`)
@@ -359,7 +435,7 @@ export default async function handler(req: any, res: any) {
       } as AgentReplyResponse)
     }
 
-    // ── 7. Verify post and user reply exist ────────────────────
+    // ── 8. Verify post and user reply exist ────────────────────
     const { data: post } = await getSupabaseAdmin()
       .from('posts')
       .select('id')
@@ -378,7 +454,31 @@ export default async function handler(req: any, res: any) {
       return res.status(404).json({ error: 'User reply not found' })
     }
 
-    // ── 8. Rate limit checks (parallel) ───────────────────────
+    // ── 9. Daily cost ceiling check ────────────────────────────
+    const dailyLimit = parseInt(process.env.AGENT_REPLIES_DAILY_COST_LIMIT_CENTS ?? '2000', 10)
+    const todaySpend = await getTodaySpendCents()
+    if (todaySpend >= dailyLimit) {
+      console.log(`[agent-reply] Daily cost limit hit: ${todaySpend}/${dailyLimit} cents`)
+      return res.status(200).json({
+        error:        'Agents are resting for today. They will be back tomorrow.',
+        isCapHit:     true,
+        capHitReason: 'daily_cost_limit',
+      })
+    }
+
+    // ── 10. Per-user daily cap check ───────────────────────────
+    const userDailyCap   = parseInt(process.env.AGENT_REPLIES_PER_USER_DAILY_CAP ?? '20', 10)
+    const userDailyCount = await countUserAgentRepliesLast24h(userId!)
+    if (userDailyCount >= userDailyCap) {
+      console.log(`[agent-reply] User daily cap hit: userId=${userId} count=${userDailyCount}/${userDailyCap}`)
+      return res.status(200).json({
+        error:        "You've chatted enough with the agents today. Come back tomorrow.",
+        isCapHit:     true,
+        capHitReason: 'user_daily_limit',
+      })
+    }
+
+    // ── 11. Per-post + per-agent-per-user cap checks (parallel) ──
     const [postCount, userCount] = await Promise.all([
       countPostAgentReplies(postId!),
       countAgentRepliesToUser(postId!, userId!, taggedAgent!),
@@ -386,7 +486,7 @@ export default async function handler(req: any, res: any) {
 
     console.log(`[agent-reply] post=${postId} agent=${taggedAgent} postCount=${postCount} userCount=${userCount}`)
 
-    // ── 9a. Per-post cap hit ───────────────────────────────────
+    // ── 12a. Per-post cap hit ──────────────────────────────────
     if (postCount >= AGENT_REPLIES_PER_POST_LIMIT) {
       const pinnedExisting = await findExistingPinnedCapHit(postId!)
       if (pinnedExisting) {
@@ -409,6 +509,7 @@ export default async function handler(req: any, res: any) {
         content:     capText,
         isPinned:    true,
       })
+      await incrementTodaySpendCents(2)
       return res.status(200).json({
         success:      true,
         replyId:      row.id,
@@ -419,7 +520,7 @@ export default async function handler(req: any, res: any) {
       } as AgentReplyResponse)
     }
 
-    // ── 9b. Per-user cap hit ───────────────────────────────────
+    // ── 12b. Per-user cap hit ──────────────────────────────────
     if (userCount >= AGENT_REPLIES_PER_USER_PER_POST_LIMIT) {
       const capText = await callClaude(taggedAgent!, 'cap_hit')
       const row     = await insertAgentReply({
@@ -429,6 +530,7 @@ export default async function handler(req: any, res: any) {
         content:     capText,
         isPinned:    false,
       })
+      await incrementTodaySpendCents(2)
       return res.status(200).json({
         success:      true,
         replyId:      row.id,
@@ -439,7 +541,7 @@ export default async function handler(req: any, res: any) {
       } as AgentReplyResponse)
     }
 
-    // ── 9c. Normal reply ───────────────────────────────────────
+    // ── 12c. Normal reply ──────────────────────────────────────
     // isFinalAllowedReply: userCount is currently 4, meaning THIS reply is the
     // 5th (allowed). The 6th would be a cap hit, so we prompt a natural close.
     const isFinalAllowedReply = userCount === AGENT_REPLIES_PER_USER_PER_POST_LIMIT - 1
@@ -456,6 +558,7 @@ export default async function handler(req: any, res: any) {
       content:     replyText,
       isPinned:    false,
     })
+    await incrementTodaySpendCents(2)
 
     console.log(`[agent-reply] Posted reply ${row.id} for agent=${taggedAgent} post=${postId}`)
 
