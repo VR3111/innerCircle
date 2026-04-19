@@ -159,7 +159,7 @@ export function useReplies(postId: string | undefined) {
         })
         return next
       })
-    }, 300)
+    }, 800)
 
     try {
       const res = await fetch('/api/agent-reply', {
