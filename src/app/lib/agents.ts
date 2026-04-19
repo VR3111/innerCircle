@@ -1,10 +1,22 @@
 import { agents } from '../data/mockData'
 
+export const AGENT_NAMES = ['baron', 'blitz', 'circuit', 'reel', 'pulse', 'atlas'] as const
+export type AgentName = typeof AGENT_NAMES[number]
+
 export interface AgentMeta {
   id:    string
   name:  string
   color: string
   slug:  string
+}
+
+// Detect the first @agent mention in a reply string.
+// Case-insensitive; requires start-of-string or preceding whitespace
+// so embedded addresses like email@baron.com don't match.
+export function detectAgentMention(text: string): AgentName | null {
+  const match = text.match(/(?:^|\s)@(baron|blitz|circuit|reel|pulse|atlas)\b/i)
+  if (!match) return null
+  return match[1].toLowerCase() as AgentName
 }
 
 // Look up an agent by the username stored in their profiles row.

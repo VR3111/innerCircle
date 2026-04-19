@@ -287,12 +287,26 @@ async function findExistingPinnedCapHit(
   return data ?? null
 }
 
+// Walks up one level to find the top-level parent of a reply.
+// If the reply has no parent (it IS top-level), returns its own id.
+// Used to ensure agent replies always attach to the top-level comment,
+// not to a nested child reply (Instagram flat-threading model).
+async function resolveTopLevelParent(userReplyId: string): Promise<string> {
+  const { data } = await getSupabaseAdmin()
+    .from('replies')
+    .select('id, parent_reply_id')
+    .eq('id', userReplyId)
+    .maybeSingle()
+  if (!data) return userReplyId  // fallback: use as-is if not found
+  return data.parent_reply_id ?? data.id
+}
+
 async function insertAgentReply(params: {
-  postId:      string
-  userReplyId: string
-  agentName:   string
-  content:     string
-  isPinned:    boolean
+  postId:           string
+  topLevelParentId: string   // always the top-level comment id (flattened)
+  agentName:        string
+  content:          string
+  isPinned:         boolean
 }): Promise<{ id: string }> {
   const { data, error } = await getSupabaseAdmin()
     .from('replies')
@@ -302,7 +316,7 @@ async function insertAgentReply(params: {
       content:         params.content,
       is_agent_reply:  true,
       is_pinned:       params.isPinned,
-      parent_reply_id: params.userReplyId,
+      parent_reply_id: params.topLevelParentId,
       is_inner_circle: false,
     })
     .select('id')
@@ -465,6 +479,10 @@ export default async function handler(req: any, res: any) {
       return res.status(404).json({ error: 'User reply not found' })
     }
 
+    // Resolve the top-level parent for INSERT.
+    // Idempotency check above still uses userReplyId (unchanged).
+    const topLevelParentId = await resolveTopLevelParent(userReplyId!)
+
     // ── 9. Daily cost ceiling check ────────────────────────────
     const dailyLimit = parseInt(process.env.AGENT_REPLIES_DAILY_COST_LIMIT_CENTS ?? '2000', 10)
     const todaySpend = await getTodaySpendCents()
@@ -514,11 +532,11 @@ export default async function handler(req: any, res: any) {
       // Generate the first (and only) pinned cap-hit for this post
       const capText = await callClaude(taggedAgent!, 'cap_hit')
       const row     = await insertAgentReply({
-        postId:      postId!,
-        userReplyId: userReplyId!,
-        agentName:   taggedAgent!,
-        content:     capText,
-        isPinned:    true,
+        postId:           postId!,
+        topLevelParentId: topLevelParentId,
+        agentName:        taggedAgent!,
+        content:          capText,
+        isPinned:         true,
       })
       await incrementTodaySpendCents(2)
       return res.status(200).json({
@@ -554,11 +572,11 @@ export default async function handler(req: any, res: any) {
       isFinalReply:  isFinalAllowedReply,
     })
     const row = await insertAgentReply({
-      postId:      postId!,
-      userReplyId: userReplyId!,
-      agentName:   taggedAgent!,
-      content:     replyText,
-      isPinned:    false,
+      postId:           postId!,
+      topLevelParentId: topLevelParentId,
+      agentName:        taggedAgent!,
+      content:          replyText,
+      isPinned:         false,
     })
     await incrementTodaySpendCents(2)
 

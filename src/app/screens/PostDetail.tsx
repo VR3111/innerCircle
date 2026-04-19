@@ -6,7 +6,7 @@ import PostImage from "../components/PostImage";
 import { useLike } from "../hooks/useLike";
 import { usePost } from "../hooks/usePost";
 import { useFollow } from "../hooks/useFollow";
-import { useReplies, type Reply } from "../hooks/useReplies";
+import { useReplies, type Reply, type PendingAgentReply } from "../hooks/useReplies";
 import { useAuth } from "../contexts/AuthContext";
 import { toast } from "sonner";
 import { supabase } from "../../lib/supabase";
@@ -182,6 +182,56 @@ function ReplyCard({ replyId, username, content, timestamp, isAgentReply, varian
   )
 }
 
+// ─── Thinking dots ────────────────────────────────────────────────────────────
+
+function ThinkingDots() {
+  return (
+    <span className="inline-flex gap-1 items-center">
+      {[0, 0.2, 0.4].map((delay, i) => (
+        <motion.span
+          key={i}
+          animate={{ opacity: [0.3, 1, 0.3] }}
+          transition={{ duration: 1.4, repeat: Infinity, delay }}
+          className="w-1 h-1 rounded-full bg-white/60"
+        />
+      ))}
+    </span>
+  )
+}
+
+// ─── Thinking indicator card ──────────────────────────────────────────────────
+
+function ThinkingIndicator({ pending }: { pending: PendingAgentReply }) {
+  const agentMeta  = getAgentByUsername(pending.agentName)
+  const color      = agentMeta?.color ?? '#9B9B9B'
+  const initial    = (agentMeta?.name ?? pending.agentName)[0]?.toUpperCase() ?? '?'
+  const displayName = agentMeta?.name ?? (pending.agentName.charAt(0).toUpperCase() + pending.agentName.slice(1))
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className="flex gap-3 py-3 ml-11"
+    >
+      <div
+        className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+        style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}40` }}
+      >
+        <span className="font-['Outfit'] font-bold text-[10px] text-white">{initial}</span>
+      </div>
+      <div className="flex items-center gap-2 mt-1">
+        <span className="font-['Outfit'] font-semibold text-xs" style={{ color }}>
+          {displayName}
+        </span>
+        <span className="font-['DM_Sans'] text-xs text-white/50">is thinking</span>
+        <ThinkingDots />
+      </div>
+    </motion.div>
+  )
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 type Tab = "inner" | "everyone";
@@ -197,7 +247,7 @@ export default function PostDetail() {
     postWithAgent?.post.reactions ?? 0,
   );
   const { isFollowing, followAgent, unfollowAgent } = useFollow();
-  const { innerCircleReplies, generalReplies, loading: repliesLoading, addReply } = useReplies(postWithAgent?.post.id);
+  const { innerCircleReplies, generalReplies, loading: repliesLoading, addReply, pendingAgentReplies } = useReplies(postWithAgent?.post.id);
 
   const [activeTab, setActiveTab] = useState<Tab>("everyone");
   const [replyText, setReplyText] = useState("");
@@ -350,7 +400,7 @@ export default function PostDetail() {
     if (!text || isSubmitting) return;
     setIsSubmitting(true);
     setReplyText("");
-    const ok = await addReply(text, activeTab === 'inner', replyContext?.parentCommentId);
+    const ok = await addReply(text, activeTab === 'inner', replyContext?.parentCommentId, post.headline, post.caption);
     if (!ok) {
       toast.error("Failed to post reply");
     }
@@ -621,30 +671,44 @@ export default function PostDetail() {
                         onReply={user ? () => handleReplyTap(reply.id, reply.username, reply.id) : undefined}
                       />
 
-                      {/* Flat siblings — user and agent replies indented under top-level */}
-                      {children.length > 0 && (
-                        <div className="ml-11">
-                          {children.map((child, ci) => (
-                            <motion.div
-                              key={child.id}
-                              initial={{ opacity: 0, y: 4 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ delay: ci * 0.05 }}
-                            >
-                              <ReplyCard
-                                replyId={child.id}
-                                username={child.username}
-                                content={child.content}
-                                timestamp={child.timestamp}
-                                isAgentReply={child.isAgentReply}
-                                variant={activeTab === "inner" ? "inner" : "general"}
-                                isChild
-                                onReply={user ? () => handleReplyTap(reply.id, child.username, child.id) : undefined}
-                              />
-                            </motion.div>
-                          ))}
-                        </div>
-                      )}
+                      {/* Flat siblings + thinking indicator */}
+                      {(() => {
+                        const pending = Array.from(pendingAgentReplies.values()).find(
+                          p => p.parentReplyId === reply.id || children.some(c => c.id === p.parentReplyId)
+                        )
+                        if (children.length === 0 && !pending) return null
+                        return (
+                          <div className="ml-11">
+                            {children.map((child, ci) => (
+                              <motion.div
+                                key={child.id}
+                                initial={{ opacity: 0, y: 4 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: ci * 0.05 }}
+                              >
+                                <ReplyCard
+                                  replyId={child.id}
+                                  username={child.username}
+                                  content={child.content}
+                                  timestamp={child.timestamp}
+                                  isAgentReply={child.isAgentReply}
+                                  variant={activeTab === "inner" ? "inner" : "general"}
+                                  isChild
+                                  onReply={user ? () => handleReplyTap(reply.id, child.username, child.id) : undefined}
+                                />
+                              </motion.div>
+                            ))}
+                            <AnimatePresence>
+                              {pending && (
+                                <ThinkingIndicator
+                                  key={`thinking-${pending.parentReplyId}`}
+                                  pending={pending}
+                                />
+                              )}
+                            </AnimatePresence>
+                          </div>
+                        )
+                      })()}
                     </motion.div>
                   ))
                 )}
