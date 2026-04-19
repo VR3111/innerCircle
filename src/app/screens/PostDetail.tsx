@@ -400,12 +400,24 @@ export default function PostDetail() {
     if (!text || isSubmitting) return;
     setIsSubmitting(true);
     setReplyText("");
-    const ok = await addReply(text, activeTab === 'inner', replyContext?.parentCommentId, post.headline, post.caption);
-    if (!ok) {
+    const inserted = await addReply(text, activeTab === 'inner', replyContext?.parentCommentId, post.headline, post.caption);
+    if (!inserted) {
       toast.error("Failed to post reply");
     }
     setReplyContext(null);
     setIsSubmitting(false);
+    // Scroll the new reply near the top of the viewport (same pattern as handleReplyTap).
+    // rAF defers until React has committed the loadReplies state update to the DOM.
+    if (inserted?.id) {
+      requestAnimationFrame(() => {
+        const el = document.querySelector(`[data-reply-id="${inserted.id}"]`);
+        if (el) {
+          const HEADER_OFFSET = 80;
+          const elTop = el.getBoundingClientRect().top + window.scrollY;
+          window.scrollTo({ top: elTop - HEADER_OFFSET, behavior: 'smooth' });
+        }
+      });
+    }
   };
 
   const formatNumber = (num: number) => {

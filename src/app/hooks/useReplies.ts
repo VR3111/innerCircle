@@ -223,9 +223,9 @@ export function useReplies(postId: string | undefined) {
     parentReplyId?: string,
     postHeadline?:  string,
     postBody?:      string,
-  ): Promise<boolean> => {
+  ): Promise<{ id: string } | null> => {
     const trimmed = content.trim()
-    if (!user || !session?.access_token || !postId || !trimmed) return false
+    if (!user || !session?.access_token || !postId || !trimmed) return null
 
     const body: Record<string, unknown> = {
       user_id:         user.id,
@@ -251,7 +251,7 @@ export function useReplies(postId: string | undefined) {
 
     if (!res.ok) {
       console.error('[addReply] POST failed', res.status, await res.text())
-      return false
+      return null
     }
 
     const rows        = await res.json() as any[]
@@ -275,7 +275,7 @@ export function useReplies(postId: string | undefined) {
       })
     }
 
-    return true
+    return insertedRow?.id ? { id: insertedRow.id } : null
   }
 
   const innerCircleReplies = replies.filter(r =>  r.isInnerCircle)
