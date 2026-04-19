@@ -8,6 +8,8 @@ export interface Reply {
   content: string
   isInnerCircle: boolean
   isAgentReply: boolean
+  isPinned: boolean
+  parentReplyId: string | null
   timestamp: string
 }
 
@@ -30,6 +32,8 @@ function mapRow(row: any): Reply {
     content:       row.content,
     isInnerCircle: row.is_inner_circle,
     isAgentReply:  row.is_agent_reply,
+    isPinned:      row.is_pinned ?? false,
+    parentReplyId: row.parent_reply_id ?? null,
     timestamp:     timeAgo(row.created_at),
   }
 }
@@ -88,10 +92,24 @@ export function useReplies(postId: string | undefined) {
     void loadReplies(postId)
   }, [postId, loadReplies])
 
-  const addReply = async (content: string): Promise<boolean> => {
+  const addReply = async (
+    content: string,
+    isInnerCircle = false,
+    parentReplyId?: string,
+  ): Promise<boolean> => {
     const trimmed = content.trim()
 
     if (!user || !session?.access_token || !postId || !trimmed) return false
+
+    const body: Record<string, unknown> = {
+      user_id:         user.id,
+      post_id:         postId,
+      content:         trimmed,
+      is_inner_circle: isInnerCircle,
+    }
+    if (parentReplyId) {
+      body.parent_reply_id = parentReplyId
+    }
 
     const res = await fetch(`${SUPABASE_URL}/rest/v1/replies`, {
       method: 'POST',
@@ -101,12 +119,7 @@ export function useReplies(postId: string | undefined) {
         'Content-Type':  'application/json',
         'Prefer':        'return=minimal',
       },
-      body: JSON.stringify({
-        user_id:         user.id,
-        post_id:         postId,
-        content:         trimmed,
-        is_inner_circle: false,
-      }),
+      body: JSON.stringify(body),
     })
 
     if (!res.ok) {
