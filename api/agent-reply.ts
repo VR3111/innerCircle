@@ -121,7 +121,7 @@ function sanitizeReply(text: string): string {
 async function callClaude(
   agentName: string,
   mode: ReplyMode,
-  context?: { postHeadline: string; postBody: string; userComment: string },
+  context?: { postHeadline: string; postBody: string; userComment: string; isFinalReply?: boolean },
 ): Promise<string> {
   const key = process.env.ANTHROPIC_API_KEY
   if (!key) throw new Error('Missing ANTHROPIC_API_KEY')
@@ -142,13 +142,23 @@ async function callClaude(
     ].join(' ')
     tools = undefined
   } else {
-    userMessage = [
+    const parts = [
       `POST HEADLINE: ${context!.postHeadline}`,
       '',
       `POST BODY: ${context!.postBody}`,
       '',
       `USER COMMENT: ${context!.userComment}`,
-    ].join('\n')
+    ]
+    if (context!.isFinalReply) {
+      parts.push(
+        '',
+        '[CONVERSATION NOTE: This is the final exchange with this user on this post. ' +
+        'Bring the conversation to a natural close in your own voice — one brief closing ' +
+        'remark at the end is enough. Do not mention numbers, limits, or technical details. ' +
+        'Stay in character.]',
+      )
+    }
+    userMessage = parts.join('\n')
     tools = [{ type: 'web_search_20250305', name: 'web_search' }]
   }
 
@@ -193,9 +203,10 @@ async function countPostAgentReplies(postId: string): Promise<number> {
   return count ?? 0
 }
 
-// Counts how many agent replies have been posted in response to
-// THIS USER'S replies on THIS POST (via parent_reply_id linkage).
-async function countAgentRepliesToUser(postId: string, userId: string): Promise<number> {
+// Counts how many times THIS SPECIFIC AGENT has replied to THIS USER on THIS POST.
+// Each agent has its own independent per-user pool — replies from other agents
+// do not count toward this agent's limit.
+async function countAgentRepliesToUser(postId: string, userId: string, agentName: string): Promise<number> {
   // Step 1: find all reply IDs the user has posted on this post
   const { data: userReplies, error: e1 } = await getSupabaseAdmin()
     .from('replies')
@@ -207,12 +218,13 @@ async function countAgentRepliesToUser(postId: string, userId: string): Promise<
   if (e1) throw new Error(`countAgentRepliesToUser (user replies): ${e1.message}`)
   if (!userReplies || userReplies.length === 0) return 0
 
-  // Step 2: count agent replies whose parent is one of those reply IDs
+  // Step 2: count replies from THIS agent whose parent is one of those reply IDs
   const ids = userReplies.map(r => r.id)
   const { count, error: e2 } = await getSupabaseAdmin()
     .from('replies')
     .select('id', { count: 'exact', head: true })
     .eq('is_agent_reply', true)
+    .eq('user_id',        AGENT_PROFILE_IDS[agentName])
     .in('parent_reply_id', ids)
 
   if (e2) throw new Error(`countAgentRepliesToUser (agent replies): ${e2.message}`)
@@ -369,7 +381,7 @@ export default async function handler(req: any, res: any) {
     // ── 8. Rate limit checks (parallel) ───────────────────────
     const [postCount, userCount] = await Promise.all([
       countPostAgentReplies(postId!),
-      countAgentRepliesToUser(postId!, userId!),
+      countAgentRepliesToUser(postId!, userId!, taggedAgent!),
     ])
 
     console.log(`[agent-reply] post=${postId} agent=${taggedAgent} postCount=${postCount} userCount=${userCount}`)
@@ -428,10 +440,14 @@ export default async function handler(req: any, res: any) {
     }
 
     // ── 9c. Normal reply ───────────────────────────────────────
+    // isFinalAllowedReply: userCount is currently 4, meaning THIS reply is the
+    // 5th (allowed). The 6th would be a cap hit, so we prompt a natural close.
+    const isFinalAllowedReply = userCount === AGENT_REPLIES_PER_USER_PER_POST_LIMIT - 1
     const replyText = await callClaude(taggedAgent!, 'normal', {
       postHeadline:  postHeadline!,
       postBody:      postBody!,
       userComment:   userReplyContent!,
+      isFinalReply:  isFinalAllowedReply,
     })
     const row = await insertAgentReply({
       postId:      postId!,
