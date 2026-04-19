@@ -207,6 +207,7 @@ export default function PostDetail() {
     replyingToUsername: string
   } | null>(null);
   const composerRef = useRef<HTMLInputElement>(null);
+  const composerContainerRef = useRef<HTMLDivElement>(null);
 
   // When navigated via the comment icon (#replies hash):
   // 1. Query inner_circle to determine which tab to show
@@ -236,6 +237,26 @@ export default function PostDetail() {
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postWithAgent, user?.id]);
+
+  // Visual Viewport API — lifts the fixed composer above the iOS virtual keyboard.
+  // On desktop vv.height === window.innerHeight so offset is always 0 — no-op.
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const update = () => {
+      const offset = window.innerHeight - vv.height - vv.offsetTop
+      if (composerContainerRef.current) {
+        composerContainerRef.current.style.transform = `translateY(-${offset}px)`
+      }
+    }
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    update()
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+    }
+  }, [])
 
   // Auto-focus composer when reply context changes.
   // Using primitive dependencies avoids firing on every render from object identity changes.
@@ -310,13 +331,15 @@ export default function PostDetail() {
   const handleReplyTap = (parentCommentId: string, username: string, tappedReplyId: string) => {
     setReplyContext({ parentCommentId, replyingToUsername: username });
     setReplyText(`@${username} `);
-    // Scroll the tapped comment to just above the fixed composer.
-    // rAF defers until after the chip renders and the composer grows,
-    // so scrollIntoView sees the correct final layout.
+    // Scroll the tapped comment near the top of the visible area.
+    // HEADER_OFFSET = sticky header height (64px h-16) + 16px breathing room.
+    // rAF defers until after the chip renders so getBoundingClientRect is accurate.
     requestAnimationFrame(() => {
       const el = document.querySelector(`[data-reply-id="${tappedReplyId}"]`)
       if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'end' })
+        const HEADER_OFFSET = 80
+        const elTop = el.getBoundingClientRect().top + window.scrollY
+        window.scrollTo({ top: elTop - HEADER_OFFSET, behavior: 'smooth' })
       }
     })
   };
@@ -658,8 +681,12 @@ export default function PostDetail() {
       ─────────────────────────────────────────────────────────────────────── */}
       {user && (
         <div
+          ref={composerContainerRef}
           className="fixed bottom-0 left-0 right-0 md:left-60 md:right-[260px] z-40 bg-[#0A0A0A] border-t border-white/10"
-          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+          style={{
+            transition: 'transform 150ms ease-out',
+            paddingBottom: 'env(safe-area-inset-bottom)',
+          }}
         >
           <div className="max-w-[375px] md:max-w-[640px] mx-auto px-5 md:px-8">
 
