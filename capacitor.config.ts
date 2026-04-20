@@ -12,9 +12,17 @@ const config: CapacitorConfig = {
     // Prevents WKWebView scroll bounce at top/bottom (feels more native)
     scrollEnabled: true,
   },
-  // Placeholder — we'll populate SplashScreen/StatusBar/Keyboard plugin
-  // configs in Chunk 2 after verifying basic boot.
-  plugins: {},
+  plugins: {
+    StatusBar: {
+      // LIGHT = light icons/text (white) — correct for a permanently dark app.
+      // Applied natively before JS loads so there is no style flash on launch.
+      style: 'LIGHT',
+      // Keep the WebView full-screen. The native scroll layer (contentInset:
+      // 'always') already pushes content below the status bar without any
+      // CSS changes. Switching to false would shift the WebView frame.
+      overlaysWebView: true,
+    },
+  },
 }
 
 export default config

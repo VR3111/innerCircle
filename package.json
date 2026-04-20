@@ -15,6 +15,7 @@
     "@capacitor/cli": "^7.6.2",
     "@capacitor/core": "^7.6.2",
     "@capacitor/ios": "^7.6.2",
+    "@capacitor/status-bar": "^7.0.6",
     "@emotion/react": "11.14.0",
     "@emotion/styled": "11.14.1",
     "@mui/icons-material": "7.3.5",

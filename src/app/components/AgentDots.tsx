@@ -4,11 +4,22 @@ import { motion } from "motion/react";
 interface AgentDotsProps {
   activeAgent: string;
   onAgentClick: (agentId: string) => void;
+  /** Tighter vertical padding for use inside a compact sticky header */
+  compact?: boolean;
 }
 
-export default function AgentDots({ activeAgent, onAgentClick }: AgentDotsProps) {
+export default function AgentDots({ activeAgent, onAgentClick, compact = false }: AgentDotsProps) {
   return (
-    <div className="flex gap-3 px-6 py-4 overflow-x-auto scrollbar-hide">
+    // Outer div: constrained scroll container — takes 100% of parent width as a
+    // block element, then clips/scrolls overflow horizontally. Kept separate from
+    // the flex content below to avoid the iOS WebKit bug where a single div that
+    // is both flex container AND overflow-x:auto scroll container can expand to
+    // content-width (456px) instead of respecting the parent's width, leaking
+    // horizontal overflow to the page.
+    <div className="overflow-x-auto scrollbar-hide">
+    {/* Inner div: flex content — w-max lets it be exactly as wide as the circles
+        + gaps + padding; the outer scroll container handles clipping. */}
+    <div className={`flex gap-3 px-6 ${compact ? "py-2" : "py-4"} w-max`}>
       <button
         onClick={() => onAgentClick("all")}
         className="relative flex-shrink-0"
@@ -64,6 +75,7 @@ export default function AgentDots({ activeAgent, onAgentClick }: AgentDotsProps)
           )}
         </button>
       ))}
+    </div>
     </div>
   );
 }

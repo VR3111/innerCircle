@@ -75,7 +75,7 @@ export default function Settings() {
     <div className="min-h-screen bg-[#0A0A0A] pb-24">
 
       {/* Header */}
-      <div className="sticky top-0 z-50 bg-[#0A0A0A]/95 backdrop-blur-xl border-b border-white/5">
+      <div className="sticky top-0 z-50 bg-[#0A0A0A]/95 backdrop-blur-xl border-b border-white/5 pt-safe">
         <div className="max-w-[375px] md:max-w-[640px] mx-auto flex items-center gap-3 px-4 h-16">
           <button
             onClick={() => navigate(-1)}

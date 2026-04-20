@@ -2,6 +2,16 @@
 @import './tailwind.css';
 @import './theme.css';
 
+/* ── Layout tokens ──────────────────────────────────────────────────────────
+   --header-logo-height: content height of the mobile logo+bell bar (h-12).
+   Element B (agent dots) uses this in its sticky top offset so the two bars
+   stack correctly: top = env(safe-area-inset-top) + var(--header-logo-height)
+*/
+:root {
+  --header-logo-height: 3rem; /* 48px — must match h-12 in Home.tsx logo row */
+  --dots-row-height: 4rem;    /* 64px — compact AgentDots: py-2×2 (16px) + h-12 (48px) */
+}
+
 /* Custom utilities for Inner Circle */
 @layer utilities {
   .scrollbar-hide {
@@ -16,6 +26,10 @@
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom);
   }
+
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
 }
 
 /* Global styles */
@@ -23,8 +37,19 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Disable iOS WKWebView rubber-band bounce at page boundaries.
+   overscroll-behavior: none prevents the page from elastically
+   bouncing when the user reaches the top or bottom — but does NOT
+   affect normal momentum scrolling within the page. Supported in
+   Safari/WebKit since iOS 16. We set it on both html and body because
+   WKWebView checks the scroll root (html) AND the document body. */
+html {
+  overscroll-behavior: none;
+}
+
 body {
   font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
   background: #0A0A0A;
   overflow-x: hidden;
+  overscroll-behavior: none;
 }

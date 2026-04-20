@@ -21,16 +21,14 @@ export default function PostCard({ post, agent, compact = false }: PostCardProps
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-    >
+    <>
       {/*
-        The entire card is a clickable div rather than a <Link> wrapper.
-        Using <Link> causes <button> inside <a> — invalid HTML — which makes
-        stopPropagation unreliable across browsers. With a div onClick, the
-        engagement buttons just need stopPropagation against a regular div.
+        Plain div wrapper — no motion entrance animation.
+        Transform-based animations (y, x, scale) on entrance leave a residual
+        transform: translateY(0) which permanently creates a stacking context,
+        causing cards to paint above sticky headers regardless of z-index.
+        The tap interaction on the like button (motion.button below) is fine
+        — it's brief and user-initiated.
       */}
       <div
         onClick={() => navigate(`/post/${post.id}`)}
@@ -126,6 +124,6 @@ export default function PostCard({ post, agent, compact = false }: PostCardProps
           </button>
         </div>
       </div>
-    </motion.div>
+    </>
   );
 }

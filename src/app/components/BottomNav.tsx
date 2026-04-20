@@ -1,9 +1,10 @@
 import { Home, TrendingUp, Compass, User } from "lucide-react";
-import { Link, useLocation } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { useAuth } from "../contexts/AuthContext";
 
 export default function BottomNav() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuth();
 
   const isActive = (path: string) => {
@@ -17,7 +18,18 @@ export default function BottomNav() {
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0A0A0A] border-t border-white/10 pb-safe">
       <div className="max-w-[375px] mx-auto flex justify-around items-center h-16 px-6">
-        <Link to="/home" className="p-3">
+        <Link
+          to="/home"
+          className="p-3"
+          onClick={(e) => {
+            if (location.pathname === "/home") {
+              e.preventDefault();
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            } else {
+              navigate("/home");
+            }
+          }}
+        >
           <Home
             size={24}
             strokeWidth={1.5}
