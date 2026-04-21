@@ -1,6 +1,7 @@
 import { ArrowLeft, CheckCircle2, TrendingUp, Lock, ArrowRight, LogOut, Settings } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import BottomNav from "../components/BottomNav";
+import PageShell from "../components/PageShell";
 import { motion } from "motion/react";
 import { useAuth } from "../contexts/AuthContext";
 import { useFollow } from "../hooks/useFollow";
@@ -42,7 +43,7 @@ export default function Profile() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] pb-20">
+    <PageShell hasBottomNav hasStickyHeader className="bg-[#0A0A0A]">
       {/* Top Bar */}
       <div className="sticky top-0 z-50 bg-[#0A0A0A]/95 backdrop-blur-xl border-b border-white/5 pt-safe">
         <div className="max-w-[375px] md:max-w-none mx-auto px-6 pt-4 pb-4">
@@ -240,6 +241,6 @@ export default function Profile() {
       </div>
 
       <BottomNav />
-    </div>
+    </PageShell>
   );
 }

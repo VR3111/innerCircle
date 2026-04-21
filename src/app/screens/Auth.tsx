@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react'
 import { Eye, EyeOff } from 'lucide-react'
 import { signIn, signUp, resetPassword } from '../../lib/auth'
 import { useAuth } from '../contexts/AuthContext'
+import PageShell from '../components/PageShell'
 
 type Mode = 'signin' | 'signup' | 'forgot_password'
 
@@ -130,7 +131,8 @@ export default function Auth() {
   // ── Reset email sent ──────────────────────────────────────────────────────
   if (resetSentTo) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center px-6">
+      // lg:flex overrides lg:contents (Auth is outside DesktopLayout — see ResetPassword for pattern)
+      <PageShell hasBottomNav={false} hasStickyHeader className="bg-[#0A0A0A] flex flex-col items-center justify-center px-6 lg:flex">
         <motion.div
           initial={{ scale: 0.85, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -165,14 +167,15 @@ export default function Auth() {
             Back to Sign In
           </button>
         </motion.div>
-      </div>
+      </PageShell>
     )
   }
 
   // ── Forgot password form ──────────────────────────────────────────────────
   if (mode === 'forgot_password') {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] flex flex-col">
+      // lg:flex overrides lg:contents; flex-col preserved so inner flex-1 works
+      <PageShell hasBottomNav={false} hasStickyHeader className="bg-[#0A0A0A] flex flex-col lg:flex">
         <div className="flex-1 flex items-center justify-center px-6 py-12">
           <div className="w-full max-w-[380px]">
 
@@ -266,14 +269,14 @@ export default function Auth() {
             </motion.p>
           </div>
         </div>
-      </div>
+      </PageShell>
     )
   }
 
   // ── Email confirmation pending ────────────────────────────────────────────
   if (confirmationEmail) {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center px-6">
+      <PageShell hasBottomNav={false} hasStickyHeader className="bg-[#0A0A0A] flex flex-col items-center justify-center px-6 lg:flex">
         <motion.div
           initial={{ scale: 0.85, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -312,12 +315,13 @@ export default function Auth() {
             Back to Sign In
           </button>
         </motion.div>
-      </div>
+      </PageShell>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] flex flex-col">
+    // lg:flex overrides lg:contents; flex-col preserved so inner flex-1 works
+    <PageShell hasBottomNav={false} hasStickyHeader className="bg-[#0A0A0A] flex flex-col lg:flex">
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-[380px]">
 
@@ -485,6 +489,6 @@ export default function Auth() {
           </motion.p>
         </div>
       </div>
-    </div>
+    </PageShell>
   )
 }

@@ -3,6 +3,7 @@ import { TrendingUp, TrendingDown, ArrowLeft, ChevronRight } from "lucide-react"
 import { Link, useNavigate } from "react-router";
 import AgentDots from "../components/AgentDots";
 import BottomNav from "../components/BottomNav";
+import PageShell from "../components/PageShell";
 import { agents, Agent } from "../data/mockData";
 import { motion } from "motion/react";
 
@@ -122,7 +123,7 @@ export default function Leaderboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] pb-20">
+    <PageShell hasBottomNav hasStickyHeader className="bg-[#0A0A0A]">
       {/* Top Bar */}
       <div className="sticky top-0 z-50 bg-[#0A0A0A]/95 backdrop-blur-xl border-b border-white/5 pt-safe">
         <div className="max-w-[375px] md:max-w-none mx-auto px-6 pt-4 pb-3">
@@ -153,11 +154,9 @@ export default function Leaderboard() {
         {filteredAgents.map((agent, index) => (
           <RankRow key={agent.id} agent={agent} index={index} />
         ))}
-      </div>
 
-      {/* Your Rank - Pinned at Bottom (mobile only) */}
-      <div className="md:hidden fixed bottom-16 left-0 right-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A] to-transparent pt-8 pb-4">
-        <div className="max-w-[375px] mx-auto px-6">
+        {/* Your Rank - Sticky at bottom (mobile only) */}
+        <div className="md:hidden sticky bottom-[var(--bottom-nav-total)] bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A] to-transparent pt-8 pb-4">
           <motion.button
             onClick={() => navigate('/profile')}
             whileTap={{ scale: 0.97 }}
@@ -187,6 +186,6 @@ export default function Leaderboard() {
       </div>
 
       <BottomNav />
-    </div>
+    </PageShell>
   );
 }
