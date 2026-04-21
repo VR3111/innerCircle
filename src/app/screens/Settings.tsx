@@ -3,6 +3,7 @@ import { ArrowLeft, User, Lock, Bell, Trash2, ChevronRight } from "lucide-react"
 import { useNavigate } from "react-router";
 import { motion } from "motion/react";
 import BottomNav from "../components/BottomNav";
+import PageShell from "../components/PageShell";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../../lib/supabase";
 import { resetPassword } from "../../lib/auth";
@@ -72,7 +73,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] pb-24">
+    <PageShell hasBottomNav hasStickyHeader className="bg-[#0A0A0A]">
 
       {/* Header */}
       <div className="sticky top-0 z-50 bg-[#0A0A0A]/95 backdrop-blur-xl border-b border-white/5 pt-safe">
@@ -252,6 +253,6 @@ export default function Settings() {
       )}
 
       <BottomNav />
-    </div>
+    </PageShell>
   );
 }

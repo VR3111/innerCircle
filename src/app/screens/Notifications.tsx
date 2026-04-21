@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router";
+import PageShell from "../components/PageShell";
+import { DESKTOP_BREAKPOINT } from "../components/layout-constants";
 import {
   ArrowLeft, TrendingUp, CheckCircle2, Trophy, Star, X,
 } from "lucide-react";
@@ -195,14 +197,14 @@ export default function Notifications() {
   // Detect mobile once on mount for swipe enable
   const [canSwipe, setCanSwipe] = useState(false);
   useEffect(() => {
-    setCanSwipe(window.innerWidth < 768);
+    setCanSwipe(window.innerWidth < DESKTOP_BREAKPOINT);
   }, []);
 
   const unread = items.filter((n) => !n.read);
   const read   = items.filter((n) =>  n.read);
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] pb-20 md:pb-0">
+    <PageShell hasBottomNav hasStickyHeader className="bg-[#0A0A0A]">
 
       {/* ── Header ── */}
       <div className="sticky top-0 z-50 bg-[#0A0A0A]/95 backdrop-blur-xl border-b border-white/5 pt-safe">
@@ -358,6 +360,6 @@ export default function Notifications() {
       </div>
 
       <BottomNav />
-    </div>
+    </PageShell>
   );
 }

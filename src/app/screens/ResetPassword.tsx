@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react'
 import { Eye, EyeOff } from 'lucide-react'
 import { updatePassword } from '../../lib/auth'
 import { toast } from 'sonner'
+import PageShell from '../components/PageShell'
 
 export default function ResetPassword() {
   const navigate = useNavigate()
@@ -54,7 +55,9 @@ export default function ResetPassword() {
   // No token in URL or wrong type — the link is broken or already used
   if (!accessToken || type !== 'recovery') {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center px-6">
+      // lg:flex in className overrides lg:contents from PageShell base via twMerge,
+      // preserving the flex centering on desktop (this screen is outside DesktopLayout).
+      <PageShell hasBottomNav={false} hasStickyHeader className="bg-[#0A0A0A] flex flex-col items-center justify-center px-6 lg:flex">
         <div className="w-full max-w-[380px] text-center">
           <div className="w-20 h-20 rounded-full bg-[#E63946]/15 border-2 border-[#E63946]/40 flex items-center justify-center mx-auto mb-6">
             <span className="font-['Outfit'] font-extrabold text-[#E63946] text-3xl leading-none">✕</span>
@@ -72,7 +75,7 @@ export default function ResetPassword() {
             Back to Sign In
           </button>
         </div>
-      </div>
+      </PageShell>
     )
   }
 
@@ -102,7 +105,9 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] flex flex-col">
+    // lg:flex in className overrides lg:contents from PageShell base via twMerge,
+    // preserving the flex-col container that the inner flex-1 div depends on.
+    <PageShell hasBottomNav={false} hasStickyHeader className="bg-[#0A0A0A] flex flex-col lg:flex">
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-[380px]">
 
@@ -226,6 +231,6 @@ export default function ResetPassword() {
           </motion.p>
         </div>
       </div>
-    </div>
+    </PageShell>
   )
 }
