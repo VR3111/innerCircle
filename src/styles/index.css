@@ -6,10 +6,19 @@
    --header-logo-height: content height of the mobile logo+bell bar (h-12).
    Element B (agent dots) uses this in its sticky top offset so the two bars
    stack correctly: top = env(safe-area-inset-top) + var(--header-logo-height)
+
+   --bottom-nav-height: content height of the fixed BottomNav bar (h-16).
+   Matches the h-16 (64px) inner container in BottomNav.tsx.
+
+   --bottom-nav-total: total clearance required below scrollable content to
+   avoid the BottomNav overlap. Equals nav height + device home-indicator inset.
+   Used by PageShell and any screen that needs manual bottom spacing.
 */
 :root {
   --header-logo-height: 3rem; /* 48px — must match h-12 in Home.tsx logo row */
   --dots-row-height: 4rem;    /* 64px — compact AgentDots: py-2×2 (16px) + h-12 (48px) */
+  --bottom-nav-height: 4rem;  /* 64px — must match h-16 in BottomNav.tsx inner div */
+  --bottom-nav-total: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom));
 }
 
 /* Custom utilities for Inner Circle */
@@ -29,6 +38,14 @@
 
   .pt-safe {
     padding-top: env(safe-area-inset-top);
+  }
+
+  .mt-safe {
+    margin-top: env(safe-area-inset-top);
+  }
+
+  .mb-safe {
+    margin-bottom: env(safe-area-inset-bottom);
   }
 }
 
