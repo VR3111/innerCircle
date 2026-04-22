@@ -52,7 +52,7 @@ export function SplashScreen() {
           style={{
             marginTop: 28,
             textAlign: 'center',
-            fontFamily: 'Geist Mono, monospace',
+            fontFamily: 'ui-monospace, monospace',
             fontSize: 10,
             color: TOKENS.mute,
             letterSpacing: 2.4,

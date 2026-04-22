@@ -1,62 +1,22 @@
-import { motion } from 'motion/react';
+import { useState, useEffect } from 'react';
 import { TOKENS } from '@/lib/design-tokens';
 
-export function Logo({ compact = false, accent = '#FFFFFF' }: { compact?: boolean; accent?: string }) {
-  const text = 'SOCIAL LEVELING';
-  const fs = compact ? 12 : 13;
-  const tracking = compact ? 3.2 : 3.6;
-
-  return (
-    <div className="inline-flex items-center gap-2 relative">
-      <svg width={16} height={16} viewBox="0 0 20 20" className="block">
-        <circle cx="10" cy="10" r="8.5" fill="none" stroke={accent} strokeOpacity="0.35" strokeWidth="1">
-          <animate attributeName="r" values="8.5;9;8.5" dur="3.6s" repeatCount="indefinite" />
-        </circle>
-        <circle cx="10" cy="10" r="5" fill="none" stroke={accent} strokeOpacity="0.7" strokeWidth="1">
-          <animate attributeName="r" values="5;5.6;5" dur="3.6s" begin="0.4s" repeatCount="indefinite" />
-        </circle>
-        <circle cx="10" cy="10" r="2" fill={accent}>
-          <animate attributeName="r" values="2;2.4;2" dur="3.6s" begin="0.8s" repeatCount="indefinite" />
-        </circle>
-        <g className="animate-sl-sweep" style={{ transformOrigin: '10px 10px' }}>
-          <line x1="10" y1="10" x2="18.5" y2="10" stroke={accent} strokeOpacity="0.4" strokeWidth="0.8" />
-        </g>
-      </svg>
-
-      <div
-        className="inline-flex font-sans font-bold"
-        style={{ fontSize: fs, letterSpacing: tracking, color: accent }}
-      >
-        {text.split('').map((ch, i) => (
-          <motion.span
-            key={i} className="inline-block whitespace-pre"
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.42, delay: i * 0.028, ease: [0.2, 0.7, 0.2, 1] }}
-          >{ch}</motion.span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── SLMark ──────────────────────────────────────────────────────────────────
-// Private component supporting SocialLevelingSplash only.
-// Ported from prototype-source/logo.jsx (the correct diamond+inner-square shape).
-// NOTE: the existing exported `Logo` above uses concentric circles — known regression,
-// intentionally left broken per task constraint. This SLMark is separate.
-// Gold colour: uses TOKENS.gold (#E9C46A). Prototype uses #D4AF37 — flagged deviation.
-function SLMark({
+// ─── SLMark ───────────────────────────────────────────────────────────────────
+// Diamond + inner rotated square mark.
+// Ported from prototype-source/logo.jsx L7–71.
+// sl-spin and sl-shimmer-sweep keyframes are defined in globals.css.
+export function SLMark({
   size = 28,
+  color = TOKENS.gold,
   rotate = false,
   shimmer = false,
 }: {
   size?: number;
+  color?: string;
   rotate?: boolean;
   shimmer?: boolean;
 }) {
   const s = size;
-  const color = TOKENS.gold;
   return (
     <span style={{ position: 'relative', display: 'inline-block', width: s, height: s, flexShrink: 0 }}>
       <svg
@@ -71,11 +31,13 @@ function SLMark({
         }}
       >
         <defs>
+          {/* gold diagonal gradient — used for stroke when shimmer=true */}
           <linearGradient id={`sl-g-${s}`} x1="0" y1="0" x2="1" y2="1">
             <stop offset="0%"   stopColor="#F4D47C" />
             <stop offset="45%"  stopColor="#D4AF37" />
             <stop offset="100%" stopColor="#8C6D1A" />
           </linearGradient>
+          {/* horizontal shimmer sweep gradient */}
           <linearGradient id={`sl-sh-${s}`} x1="0" y1="0" x2="1" y2="0">
             <stop offset="0%"   stopColor="rgba(255,255,255,0)" />
             <stop offset="45%"  stopColor="rgba(255,255,255,0)" />
@@ -83,10 +45,12 @@ function SLMark({
             <stop offset="55%"  stopColor="rgba(255,255,255,0)" />
             <stop offset="100%" stopColor="rgba(255,255,255,0)" />
           </linearGradient>
+          {/* clip to diamond shape so shimmer rect doesn't bleed outside */}
           <clipPath id={`sl-clip-${s}`}>
             <path d="M50 6 L94 50 L50 94 L6 50 Z" />
           </clipPath>
         </defs>
+
         {/* outer diamond outline */}
         <path
           d="M50 6 L94 50 L50 94 L6 50 Z"
@@ -104,7 +68,7 @@ function SLMark({
           strokeWidth="7"
           strokeLinejoin="miter"
         />
-        {/* shimmer sweep overlay, clipped to diamond bounds */}
+        {/* shimmer sweep — animated rect clipped to diamond bounds */}
         {shimmer && (
           <g clipPath={`url(#sl-clip-${s})`}>
             <rect
@@ -120,25 +84,113 @@ function SLMark({
   );
 }
 
+// ─── SocialLevelingLogo ───────────────────────────────────────────────────────
+// Horizontal inline lockup: SLMark + per-letter staggered "SOCIAL LEVELING".
+// Ported from prototype-source/logo.jsx L72–112.
+// Props:
+//   size    — scale multiplier (default 1). Affects font, mark, and gap sizes.
+//   compact — shorthand for size=0.85 (header usage). Multiplied on top of size.
+//   rotate  — pass through to SLMark (default true)
+//   shimmer — pass through to SLMark (default true)
+//   mono    — render everything white (for light bg contexts)
+export function SocialLevelingLogo({
+  size = 1,
+  rotate = true,
+  shimmer = true,
+  mono = false,
+  compact = false,
+}: {
+  size?: number;
+  rotate?: boolean;
+  shimmer?: boolean;
+  mono?: boolean;
+  compact?: boolean;
+}) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), 40);
+    return () => clearTimeout(t);
+  }, []);
+
+  const s = compact ? 0.85 * size : size;
+  const fs = 13 * s;
+  const tracking = 3.4;
+  const markSize = 18 * s;
+  const gold = TOKENS.gold;
+  const white = '#FFFFFF';
+
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9 * s }}>
+      <SLMark
+        size={markSize}
+        color={mono ? white : gold}
+        rotate={rotate}
+        shimmer={shimmer && !mono}
+      />
+      <div style={{
+        fontFamily: 'Inter, system-ui, sans-serif',
+        fontSize: fs,
+        fontWeight: 700,
+        letterSpacing: tracking,
+        display: 'inline-flex',
+      }}>
+        {'SOCIAL'.split('').map((ch, i) => (
+          <span
+            key={'s' + i}
+            style={{
+              color: mono ? white : gold,
+              opacity: mounted ? 1 : 0,
+              transform: mounted ? 'translateY(0)' : 'translateY(5px)',
+              transition: `opacity 420ms cubic-bezier(.2,.7,.2,1) ${i * 26}ms, transform 480ms cubic-bezier(.2,.7,.2,1) ${i * 26}ms`,
+              display: 'inline-block',
+              whiteSpace: 'pre',
+            }}
+          >{ch}</span>
+        ))}
+        {/* spacer between SOCIAL and LEVELING, width = letterSpacing value */}
+        <span style={{ width: tracking, display: 'inline-block' }} />
+        {'LEVELING'.split('').map((ch, i) => (
+          <span
+            key={'l' + i}
+            style={{
+              color: white,
+              opacity: mounted ? 1 : 0,
+              transform: mounted ? 'translateY(0)' : 'translateY(5px)',
+              // stagger LEVELING letters starting after SOCIAL (offset +6)
+              transition: `opacity 420ms cubic-bezier(.2,.7,.2,1) ${(i + 6) * 26}ms, transform 480ms cubic-bezier(.2,.7,.2,1) ${(i + 6) * 26}ms`,
+              display: 'inline-block',
+              whiteSpace: 'pre',
+            }}
+          >{ch}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Logo ─────────────────────────────────────────────────────────────────────
+// Backward-compatible wrapper around SocialLevelingLogo.
+// All screens import { Logo } — this keeps those imports working unchanged.
+export function Logo({ compact = false }: { compact?: boolean }) {
+  return <SocialLevelingLogo compact={compact} />;
+}
+
 // ─── SocialLevelingSplash ─────────────────────────────────────────────────────
-// Big splash variant — large SLMark above centered wordmark.
+// Vertical stacked lockup for the splash screen: large SLMark above wordmark.
 // Ported from prototype-source/logo.jsx L115–131.
-// Downstream gap: SLMark here is the correct diamond shape, but the existing
-// exported `Logo` (used in HomeScreen/AuthScreen headers) still uses broken
-// concentric circles. Both live in this file; the Logo regression is fixed later.
 export function SocialLevelingSplash({ scale = 1 }: { scale?: number }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 28 * scale }}>
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 28 * scale,
+    }}>
       <SLMark size={92 * scale} rotate shimmer />
-      <div
-        style={{
-          fontFamily: 'Geist, system-ui',
-          fontWeight: 700,
-          fontSize: 20 * scale,
-          letterSpacing: 5.4,
-          display: 'inline-flex',
-        }}
-      >
+      <div style={{
+        fontFamily: 'Inter, system-ui',
+        fontWeight: 700,
+        fontSize: 20 * scale,
+        letterSpacing: 5.4,
+        display: 'inline-flex',
+      }}>
         <span style={{ color: TOKENS.gold }}>SOCIAL</span>
         <span style={{ width: 6 }} />
         <span style={{ color: '#FFFFFF' }}>LEVELING</span>

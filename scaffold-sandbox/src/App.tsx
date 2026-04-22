@@ -3,6 +3,7 @@ import { MobileLayout } from './layouts/MobileLayout';
 import { DesktopLayout } from './layouts/DesktopLayout';
 import { useIsDesktop } from './lib/useIsDesktop';
 import { SplashScreen } from './screens/SplashScreen';
+import { OnboardingScreen } from './screens/OnboardingScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { PostDetailScreen } from './screens/PostDetailScreen';
 import { LeaderboardScreen } from './screens/LeaderboardScreen';
@@ -35,7 +36,7 @@ export function App() {
         <Route path="/paywall" element={<PlaceholderScreen title="Paywall" />} />
         <Route path="/auth" element={<AuthScreen />} />
         <Route path="/reset-password" element={<PlaceholderScreen title="Reset Password" />} />
-        <Route path="/onboarding" element={<PlaceholderScreen title="Onboarding" />} />
+        <Route path="/onboarding" element={<OnboardingScreen />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Shell>
