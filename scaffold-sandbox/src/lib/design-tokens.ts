@@ -11,6 +11,7 @@ export const TOKENS = {
   mute2: 'rgba(255,255,255,0.38)',
   mute3: 'rgba(255,255,255,0.22)',
   gold: '#D4AF37',
+  down: '#FF5A5F',
 } as const;
 
 export type AgentId = 'ALL' | 'BARON' | 'BLITZ' | 'CIRCUIT' | 'REEL' | 'PULSE' | 'ATLAS';

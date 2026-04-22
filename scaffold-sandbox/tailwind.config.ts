@@ -15,6 +15,7 @@ export default {
         mute2: 'rgba(255,255,255,0.38)',
         mute3: 'rgba(255,255,255,0.22)',
         gold:  '#D4AF37',
+        down:  '#FF5A5F',
         agent: {
           baron:   '#E63946',
           blitz:   '#F4A261',

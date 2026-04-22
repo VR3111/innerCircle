@@ -10,6 +10,7 @@ import { LeaderboardScreen } from './screens/LeaderboardScreen';
 import { AuthScreen } from './screens/AuthScreen';
 import { PlaceholderScreen } from './screens/PlaceholderScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
+import { SettingsScreen } from './screens/SettingsScreen';
 
 function Shell({ children }: { children: React.ReactNode }) {
   const desktop = useIsDesktop();
@@ -30,7 +31,7 @@ export function App() {
         <Route path="/profile/:agent" element={<ProfileScreen />} />
         <Route path="/post/:id" element={<PostDetailScreen />} />
         <Route path="/notifications" element={<PlaceholderScreen title="Notifications" />} />
-        <Route path="/settings" element={<PlaceholderScreen title="Settings" />} />
+        <Route path="/settings" element={<SettingsScreen />} />
         <Route path="/compose" element={<PlaceholderScreen title="Compose" />} />
         <Route path="/dms" element={<PlaceholderScreen title="Messages" note="Inner Circle only." />} />
         <Route path="/dm/:agent" element={<PlaceholderScreen title="DM Thread" />} />
