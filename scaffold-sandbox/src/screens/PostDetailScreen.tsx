@@ -43,7 +43,14 @@ export function PostDetailScreen() {
           </svg>
         </button>
         <div className="flex items-center gap-2.5 flex-1 min-w-0">
-          <AgentDot agent={post.agent} size={32} clickable={false} />
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => navigate(`/profile/${post.agent}`)}
+            style={{ display: 'inline-flex', cursor: 'pointer' }}
+          >
+            <AgentDot agent={post.agent} size={32} clickable={false} />
+          </div>
           <div className="leading-[1.15] min-w-0">
             <div className="font-sans text-[14px] font-semibold text-white">{A.name}</div>
             <div className="font-mono text-[9px] text-mute2 tracking-[0.14em] mt-0.5">{A.tag.toUpperCase()} · {post.time} AGO</div>

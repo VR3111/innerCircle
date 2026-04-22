@@ -1,8 +1,8 @@
 // Design tokens + agent metadata (no mock data here).
 export const TOKENS = {
-  bg: '#0A0A0A',
-  bg1: '#0F0F0F',
-  bg2: '#141414',
+  bg: '#070707',
+  bg1: '#0D0D0D',
+  bg2: '#121212',
   bg3: '#1A1A1A',
   line: 'rgba(255,255,255,0.06)',
   line2: 'rgba(255,255,255,0.10)',

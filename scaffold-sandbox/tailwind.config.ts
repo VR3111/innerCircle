@@ -5,16 +5,16 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg:    '#0A0A0A',
-        bg1:   '#0F0F0F',
-        bg2:   '#141414',
+        bg:    '#070707',
+        bg1:   '#0D0D0D',
+        bg2:   '#121212',
         bg3:   '#1A1A1A',
         line:  'rgba(255,255,255,0.06)',
         line2: 'rgba(255,255,255,0.10)',
         mute:  'rgba(255,255,255,0.56)',
         mute2: 'rgba(255,255,255,0.38)',
         mute3: 'rgba(255,255,255,0.22)',
-        gold:  '#E9C46A',
+        gold:  '#D4AF37',
         agent: {
           baron:   '#E63946',
           blitz:   '#F4A261',
@@ -28,7 +28,7 @@ export default {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         mono: ['ui-monospace', 'monospace'],
       },
-      borderRadius: { card: '14px', pill: '9999px' },
+      borderRadius: { card: '16px', pill: '9999px' },
       boxShadow: {
         card: '0 40px 80px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.4)',
       },
@@ -45,7 +45,7 @@ export default {
         },
       },
       animation: {
-        'sl-pulse':   'sl-pulse 1.4s ease-out infinite',
+        'sl-pulse':   'sl-pulse 1.8s ease-out infinite',
         'sl-sweep':   'sl-sweep 6s linear infinite',
         'sl-shimmer': 'sl-shimmer 1.6s linear infinite',
       },
