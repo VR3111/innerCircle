@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --bg: #0A0A0A;
+  --bg-1: #0F0F0F;
+  --bg-2: #141414;
+  --bg-3: #1A1A1A;
+  --line: rgba(255,255,255,0.06);
+  --line-2: rgba(255,255,255,0.10);
+  --text: #FFFFFF;
+  --mute: rgba(255,255,255,0.56);
+  --mute-2: rgba(255,255,255,0.38);
+  --mute-3: rgba(255,255,255,0.22);
+  --gold: #E9C46A;
+
+  --agent-baron:   #E63946;
+  --agent-blitz:   #F4A261;
+  --agent-circuit: #457B9D;
+  --agent-reel:    #E9C46A;
+  --agent-pulse:   #2A9D8F;
+  --agent-atlas:   #6C757D;
+
+  --ic-top-inset: env(safe-area-inset-top, 0px);
+  --ic-bot-inset: env(safe-area-inset-bottom, 0px);
+}
+
+html, body, #root { height: 100%; margin: 0; padding: 0; background: var(--bg); }
+* { box-sizing: border-box; }
+
+/* hide scrollbar but keep scroll */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+
+/* shimmer base */
+.sl-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.03) 0%,
+    rgba(255,255,255,0.08) 40%,
+    rgba(255,255,255,0.03) 80%
+  );
+  background-size: 400px 100%;
+}

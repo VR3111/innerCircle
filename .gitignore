@@ -24,3 +24,6 @@ supabase/.temp/
 ios/App/Pods/
 ios/App/App.xcworkspace/xcuserdata/
 ios/.DS_Store
+
+# TypeScript incremental build cache
+*.tsbuildinfo
