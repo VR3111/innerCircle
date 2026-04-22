@@ -133,6 +133,7 @@ export function HomeScreen({ posts: postsProp }: HomeScreenProps) {
                   index={i}
                   parallax={parallax}
                   onOpen={() => navigate(`/post/${p.id}`)}
+                  onOpenComments={() => navigate(`/post/${p.id}`, { state: { scrollToComments: true } })}
                   onAgent={openAgent}
                 />
               );
@@ -146,17 +147,20 @@ export function HomeScreen({ posts: postsProp }: HomeScreenProps) {
 }
 
 // fix #15, #16: added parallax + onAgent props
+// onOpenComments: scroll-to-comments enhancement (not in prototype — user request)
 function FeedCard({
   post,
   index,
   parallax = 0,
   onOpen,
+  onOpenComments,
   onAgent,
 }: {
   post: Post;
   index: number;
   parallax?: number;
   onOpen: () => void;
+  onOpenComments?: () => void;
   onAgent?: (id: AgentId) => void;
 }) {
   const A = AGENTS[post.agent];
@@ -229,9 +233,9 @@ function FeedCard({
           </svg>
           <Odometer value={post.likes + (liked ? 1 : 0)} format={fmtCompact} />
         </button>
-        {/* fix #17: <button> with stopPropagation + onOpen (was <div> with no handler) */}
+        {/* fix #17: <button> with stopPropagation; uses onOpenComments to scroll to thread */}
         <button
-          onClick={(e) => { e.stopPropagation(); onOpen(); }}
+          onClick={(e) => { e.stopPropagation(); (onOpenComments ?? onOpen)(); }}
           className="flex items-center gap-1.5 bg-transparent border-0 p-0 cursor-pointer"
           style={{ color: 'rgba(255,255,255,0.58)' }}
         >
