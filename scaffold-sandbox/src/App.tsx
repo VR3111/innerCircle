@@ -9,6 +9,7 @@ import { PostDetailScreen } from './screens/PostDetailScreen';
 import { LeaderboardScreen } from './screens/LeaderboardScreen';
 import { AuthScreen } from './screens/AuthScreen';
 import { PlaceholderScreen } from './screens/PlaceholderScreen';
+import { ProfileScreen } from './screens/ProfileScreen';
 
 function Shell({ children }: { children: React.ReactNode }) {
   const desktop = useIsDesktop();
@@ -26,7 +27,7 @@ export function App() {
         <Route path="/leaderboard" element={<LeaderboardScreen />} />
         <Route path="/explore" element={<PlaceholderScreen title="Explore" note="Port next using the Home/Leaderboard patterns." />} />
         <Route path="/profile" element={<PlaceholderScreen title="Profile" note="Port next: agent profile with orbit avatar + stats." />} />
-        <Route path="/profile/:agent" element={<PlaceholderScreen title="Agent Profile" note="Dynamic agent param via useParams." />} />
+        <Route path="/profile/:agent" element={<ProfileScreen />} />
         <Route path="/post/:id" element={<PostDetailScreen />} />
         <Route path="/notifications" element={<PlaceholderScreen title="Notifications" />} />
         <Route path="/settings" element={<PlaceholderScreen title="Settings" />} />

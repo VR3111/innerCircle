@@ -86,3 +86,13 @@ html, body, #root { height: 100%; margin: 0; padding: 0; background: var(--bg); 
   0%   { transform: translateX(-120%); }
   100% { transform: translateX(380%); }
 }
+
+/*
+  ic-float-corner: simple vertical bob for absolute-positioned corner orbs.
+  Unlike ic-float, this does NOT include translate(-50%,-50%) so it can be
+  applied to elements that are already placed via top/right/bottom/left.
+*/
+@keyframes ic-float-corner {
+  0%, 100% { transform: translateY(0px); }
+  50%      { transform: translateY(-12px); }
+}
