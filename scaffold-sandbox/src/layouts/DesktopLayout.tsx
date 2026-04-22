@@ -7,13 +7,13 @@ import { LEADERBOARD, POSTS, fmtCompact } from '@/lib/mock-data';
 import { Odometer, LivePulse, Sparkline } from '@/components/primitives';
 
 const NAV = [
-  { path: '/',             label: 'Home' },
-  { path: '/leaderboard',  label: 'Leaderboard' },
-  { path: '/explore',      label: 'Explore' },
-  { path: '/profile',      label: 'Profile' },
-  { path: '/dms',          label: 'Messages' },
-  { path: '/notifications', label: 'Notifications' },
-  { path: '/settings',     label: 'Settings' },
+  { path: '/home',          label: 'Home' },
+  { path: '/leaderboard',   label: 'Leaderboard' },
+  { path: '/explore',       label: 'Explore' },
+  { path: '/profile',       label: 'Profile' },
+  { path: '/dms',           label: 'Messages' },
+  { path: '/notifications',  label: 'Notifications' },
+  { path: '/settings',      label: 'Settings' },
 ];
 
 function Sidebar() {
@@ -23,7 +23,7 @@ function Sidebar() {
 
       <nav className="px-3 flex flex-col gap-0.5">
         {NAV.map(n => (
-          <NavLink key={n.path} to={n.path} end={n.path === '/'}
+          <NavLink key={n.path} to={n.path} end
             className={({ isActive }) =>
               `px-3 py-2.5 rounded-[10px] font-sans text-[14px] font-medium transition-colors ${
                 isActive ? 'bg-white/[0.06] text-white' : 'text-mute hover:bg-white/[0.03] hover:text-white'
@@ -137,8 +137,11 @@ function RightRail() {
 
 export function DesktopLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
-  // Auth-style full-bleed routes render without sidebars
-  const bare = ['/auth', '/reset-password', '/splash', '/onboarding'].some(p => location.pathname.startsWith(p));
+  // Auth-style full-bleed routes render without sidebars.
+  // Root `/` is Splash — exact match needed (startsWith('/') would match everything).
+  const bare =
+    location.pathname === '/' ||
+    ['/auth', '/reset-password', '/onboarding'].some(p => location.pathname.startsWith(p));
 
   if (bare) {
     return <div className="fixed inset-0 bg-bg overflow-auto">{children}</div>;

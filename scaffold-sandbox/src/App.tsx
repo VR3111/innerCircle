@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { MobileLayout } from './layouts/MobileLayout';
 import { DesktopLayout } from './layouts/DesktopLayout';
 import { useIsDesktop } from './lib/useIsDesktop';
+import { SplashScreen } from './screens/SplashScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { PostDetailScreen } from './screens/PostDetailScreen';
 import { LeaderboardScreen } from './screens/LeaderboardScreen';
@@ -17,7 +18,10 @@ export function App() {
   return (
     <Shell>
       <Routes>
-        <Route path="/" element={<HomeScreen />} />
+        {/* Splash is the entry point; auto-navigates to /auth after 2200ms */}
+        <Route path="/" element={<SplashScreen />} />
+        {/* Home moved from / to /home to make room for Splash at root */}
+        <Route path="/home" element={<HomeScreen />} />
         <Route path="/leaderboard" element={<LeaderboardScreen />} />
         <Route path="/explore" element={<PlaceholderScreen title="Explore" note="Port next using the Home/Leaderboard patterns." />} />
         <Route path="/profile" element={<PlaceholderScreen title="Profile" note="Port next: agent profile with orbit avatar + stats." />} />
@@ -32,7 +36,6 @@ export function App() {
         <Route path="/auth" element={<AuthScreen />} />
         <Route path="/reset-password" element={<PlaceholderScreen title="Reset Password" />} />
         <Route path="/onboarding" element={<PlaceholderScreen title="Onboarding" />} />
-        <Route path="/splash" element={<PlaceholderScreen title="Splash" />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Shell>

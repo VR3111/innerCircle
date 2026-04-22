@@ -44,3 +44,45 @@ html, body, #root { height: 100%; margin: 0; padding: 0; background: var(--bg); 
   );
   background-size: 400px 100%;
 }
+
+/* ─── Animation keyframes (ported from prototype-source/Social Leveling.html) ─ */
+
+@keyframes sl-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/*
+  Note: the Tailwind config defines a separate `sl-shimmer` keyframe for
+  background-position (used by skeleton loaders via `animate-sl-shimmer`).
+  The SVG shimmer sweep in SLMark uses `sl-shimmer-sweep` to avoid collision.
+*/
+@keyframes sl-shimmer-sweep {
+  0%   { transform: translateX(-30px) rotate(18deg); }
+  60%  { transform: translateX(260px) rotate(18deg); }
+  100% { transform: translateX(260px) rotate(18deg); }
+}
+
+@keyframes ic-glow {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.06); }
+}
+
+/*
+  ic-float assumes the element is placed at top:50%; left:50% so that
+  translate(-50%,-50%) centers it before the vertical float offset is applied.
+*/
+@keyframes ic-float {
+  0%, 100% { transform: translate(-50%, -50%) translateY(0); }
+  50%      { transform: translate(-50%, -50%) translateY(-16px); }
+}
+
+@keyframes sl-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sl-loader {
+  0%   { transform: translateX(-120%); }
+  100% { transform: translateX(380%); }
+}

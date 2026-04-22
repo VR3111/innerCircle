@@ -30,7 +30,7 @@ const ICONS = {
 };
 
 const TABS = [
-  { id: 'home',        path: '/',             label: 'Home' },
+  { id: 'home',        path: '/home',         label: 'Home' },
   { id: 'leaderboard', path: '/leaderboard',  label: 'Ranks' },
   { id: 'explore',     path: '/explore',      label: 'Explore' },
   { id: 'profile',     path: '/profile',      label: 'Profile' },
@@ -45,7 +45,7 @@ export function BottomNav({ accent = '#E9C46A' }: { accent?: string }) {
     >
       {TABS.map(t => (
         <NavLink
-          key={t.id} to={t.path} end={t.path === '/'}
+          key={t.id} to={t.path} end
           className="relative p-2 bg-transparent border-0 cursor-pointer"
         >
           {({ isActive }) => {
@@ -70,10 +70,13 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Hide bottom nav on certain routes
-  const hideNav = ['/post/', '/auth', '/onboarding', '/splash', '/compose', '/dm/'].some(p =>
-    location.pathname.startsWith(p)
-  );
+  // Hide bottom nav on certain routes. Root path `/` is Splash — exact match needed
+  // to avoid hiding nav on all sub-paths (startsWith('/') would match everything).
+  const hideNav =
+    location.pathname === '/' ||
+    ['/post/', '/auth', '/onboarding', '/compose', '/dm/'].some(p =>
+      location.pathname.startsWith(p)
+    );
 
   return (
     <div className="fixed inset-0 flex flex-col bg-bg overflow-hidden">
