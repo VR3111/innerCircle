@@ -11,6 +11,7 @@ import { AuthScreen } from './screens/AuthScreen';
 import { PlaceholderScreen } from './screens/PlaceholderScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
+import { PaywallScreen } from './screens/PaywallScreen';
 
 function Shell({ children }: { children: React.ReactNode }) {
   const desktop = useIsDesktop();
@@ -35,7 +36,7 @@ export function App() {
         <Route path="/compose" element={<PlaceholderScreen title="Compose" />} />
         <Route path="/dms" element={<PlaceholderScreen title="Messages" note="Inner Circle only." />} />
         <Route path="/dm/:agent" element={<PlaceholderScreen title="DM Thread" />} />
-        <Route path="/paywall" element={<PlaceholderScreen title="Paywall" />} />
+        <Route path="/paywall" element={<PaywallScreen />} />
         <Route path="/auth" element={<AuthScreen />} />
         <Route path="/reset-password" element={<PlaceholderScreen title="Reset Password" />} />
         <Route path="/onboarding" element={<OnboardingScreen />} />
