@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Social Leveling</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: dark; }
+  html, body, #root { margin:0; padding:0; width:100%; height:100%; background:#070707; }
+  body {
+    font-family:'Geist', system-ui, -apple-system, sans-serif; color:#fff;
+    -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+    overflow:hidden;
+  }
+  * { box-sizing:border-box; }
+  .ic-no-scrollbar::-webkit-scrollbar { display:none; width:0; height:0; }
+  .ic-no-scrollbar { scrollbar-width:none; -ms-overflow-style:none; }
+  button, input, textarea { -webkit-tap-highlight-color:transparent; font-family:inherit; }
+  input:focus, textarea:focus { outline:none; }
+
+  @keyframes ic-pulse {
+    0%   { box-shadow: 0 0 0 0 currentColor; opacity:1; }
+    70%  { box-shadow: 0 0 0 8px rgba(0,0,0,0); opacity:0.6; }
+    100% { box-shadow: 0 0 0 0 rgba(0,0,0,0); opacity:1; }
+  }
+  @keyframes ic-glow {
+    0%,100% { opacity:0.85; transform:scale(1); }
+    50%     { opacity:1;    transform:scale(1.06); }
+  }
+  @keyframes ic-float {
+    0%,100% { transform:translate(-50%,-50%) translateY(0); }
+    50%     { transform:translate(-50%,-50%) translateY(-16px); }
+  }
+  @keyframes ic-sweep { from{transform:rotate(0);} to{transform:rotate(360deg);} }
+  @keyframes ic-rank-glow { 0%,100%{opacity:.8;} 50%{opacity:1;} }
+  @keyframes sl-spin { from{transform:rotate(0);} to{transform:rotate(360deg);} }
+  @keyframes sl-shimmer {
+    0%   { transform:translateX(-30px) rotate(18deg); }
+    60%  { transform:translateX(260px) rotate(18deg); }
+    100% { transform:translateX(260px) rotate(18deg); }
+  }
+  @keyframes sl-fade-in {
+    from { opacity:0; transform:translateY(8px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+  @keyframes sl-loader {
+    0%   { transform:translateX(-120%); }
+    100% { transform:translateX(380%); }
+  }
+  @keyframes sl-typing {
+    0%,60%,100% { opacity:0.3; transform:translateY(0); }
+    30%         { opacity:1;   transform:translateY(-3px); }
+  }
+
+  @media (max-width: 899px) {
+    html, body, #root { overflow:hidden; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="tokens.jsx"></script>
+<script type="text/babel" src="primitives.jsx"></script>
+<script type="text/babel" src="logo.jsx"></script>
+<script type="text/babel" src="screen-splash.jsx"></script>
+<script type="text/babel" src="screen-onboarding.jsx"></script>
+<script type="text/babel" src="screen-auth.jsx"></script>
+<script type="text/babel" src="screen-home.jsx"></script>
+<script type="text/babel" src="screen-profile.jsx"></script>
+<script type="text/babel" src="screen-leaderboard.jsx"></script>
+<script type="text/babel" src="screen-post.jsx"></script>
+<script type="text/babel" src="screen-explore.jsx"></script>
+<script type="text/babel" src="screen-notifications.jsx"></script>
+<script type="text/babel" src="screen-settings.jsx"></script>
+<script type="text/babel" src="screen-paywall.jsx"></script>
+<script type="text/babel" src="screen-dm.jsx"></script>
+<script type="text/babel" src="screen-compose.jsx"></script>
+<script type="text/babel" src="app.jsx"></script>
+</body>
+</html>
