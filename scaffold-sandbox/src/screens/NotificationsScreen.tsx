@@ -61,6 +61,16 @@ export function NotificationsScreen() {
   // TODO: wire to backend — marks all server-side notifications read
   const markAll = () => setItems(items.map(n => ({ ...n, unread: false })));
 
+  function handleTap(n: Notification) {
+    // Mark as read on tap (even if no link) — matches iOS / Twitter pattern
+    if (n.unread) {
+      setItems(prev => prev.map(item =>
+        item.id === n.id ? { ...item, unread: false } : item,
+      ));
+    }
+    if (n.link) navigate(n.link);
+  }
+
   return (
     <div style={{
       display: 'flex', flexDirection: 'column',
@@ -109,15 +119,30 @@ export function NotificationsScreen() {
         style={{ flex: 1, overflowY: 'auto', padding: '14px 20px 40px' }}
       >
         {items.map((n, i) => (
-          // TODO: add onClick to deep-link into post/leaderboard/profile by `kind`
           <div
             key={n.id}
+            onClick={() => handleTap(n)}
+            onMouseEnter={(e) => {
+              if (!n.link) return;
+              e.currentTarget.style.transform = 'translateY(-1px)';
+              e.currentTarget.style.borderColor = n.unread
+                ? 'rgba(212,175,55,0.4)'
+                : 'rgba(255,255,255,0.12)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.borderColor = n.unread
+                ? 'rgba(212,175,55,0.2)'
+                : TOKENS.line;
+            }}
             style={{
               display: 'flex', gap: 12, padding: '14px',
               marginBottom: 8, borderRadius: 12,
               background: n.unread ? 'rgba(212,175,55,0.05)' : 'rgba(255,255,255,0.02)',
               border: `1px solid ${n.unread ? 'rgba(212,175,55,0.2)' : TOKENS.line}`,
               animation: `sl-fade-in 400ms ease ${i * 40}ms both`,
+              cursor: n.link ? 'pointer' : 'default',
+              transition: 'transform 180ms cubic-bezier(.2,.8,.2,1), border-color 180ms ease',
             }}
           >
             <NotifIcon notif={n} />

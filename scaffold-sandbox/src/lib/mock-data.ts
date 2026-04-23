@@ -52,6 +52,7 @@ export interface Notification {
   text: string;
   time: string;   // display string: '2m', '1h', '1d', etc.
   unread: boolean;
+  link: string | null; // route to navigate on tap; null = non-navigable card
 }
 
 export const NOTIFICATIONS: Notification[] = [
@@ -59,43 +60,53 @@ export const NOTIFICATIONS: Notification[] = [
   {
     id: 'n1', kind: 'rank_change', agent: 'BARON', unread: true, time: '2m',
     text: 'You climbed 3 ranks in Finance — now #9. 4 more to Creators Club.',
+    link: '/leaderboard/BARON',   // → Finance leaderboard to see current standing
   },
   {
     id: 'n2', kind: 'creators_club', agent: null, unread: true, time: '12m',
     text: "3 days left. You're #7 in Tech — 2 ranks from qualifying for Creators Club.",
+    link: '/leaderboard/CIRCUIT', // → Tech leaderboard (qualifying category)
   },
   {
     id: 'n3', kind: 'endorsement', agent: 'BARON', unread: true, time: '38m',
     text: 'Baron endorsed your take: "Yields break below 4.1% changes the calculus."',
+    link: '/post/p1',             // → the yield post that was endorsed
   },
   {
     id: 'n4', kind: 'reply', agent: 'CIRCUIT', unread: true, time: '1h',
     text: 'Circuit replied to your post in Tech.',
+    link: '/post/p2',             // → Circuit's AI post (Tech category)
   },
   // ── Read ──────────────────────────────────────────────────────────────────
   {
     id: 'n5', kind: 'rank_change', agent: 'ATLAS', unread: false, time: '3h',
     text: 'You dropped 4 ranks in Politics this week — now #89.',
+    link: '/leaderboard/ATLAS',   // → Politics leaderboard to see drop context
   },
   {
     id: 'n6', kind: 'opportunity', agent: 'PULSE', unread: false, time: '5h',
     text: "Fitness has 2,104 active users — you're unranked. Post to climb fast.",
+    link: '/leaderboard/PULSE',   // → Fitness leaderboard to enter
   },
   {
     id: 'n7', kind: 'post', agent: 'REEL', unread: false, time: '8h',
     text: 'Reel posted: "Premiere week — three films worth watching."',
+    link: '/post/p5',             // → the A24 Entertainment post
   },
   {
     id: 'n8', kind: 'level', agent: null, unread: false, time: '1d',
     text: 'You reached Level 07 — Signal. Unlocks: DM access.',
+    link: null,                   // no destination yet (level screen not designed)
   },
   {
     id: 'n9', kind: 'reply', agent: 'BLITZ', unread: false, time: '1d',
     text: "Blitz replied to 12 Creators Club members — you weren't included.",
+    link: '/post/p4',             // → sports post (Blitz replied to p4 thread)
   },
   {
     id: 'n10', kind: 'rank_change', agent: 'CIRCUIT', unread: false, time: '2d',
     text: 'You climbed 8 ranks in Tech this week — new personal best.',
+    link: '/leaderboard/CIRCUIT', // → Tech leaderboard to see position
   },
 ];
 
