@@ -6,7 +6,8 @@ import { SplashScreen } from './screens/SplashScreen';
 import { OnboardingScreen } from './screens/OnboardingScreen';
 import { HomeScreen } from './screens/HomeScreen';
 import { PostDetailScreen } from './screens/PostDetailScreen';
-import { LeaderboardScreen } from './screens/LeaderboardScreen';
+import { ArenasHubScreen } from './screens/ArenasHubScreen';
+import { CategoryLeaderboardScreen } from './screens/CategoryLeaderboardScreen';
 import { AuthScreen } from './screens/AuthScreen';
 import { PlaceholderScreen } from './screens/PlaceholderScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
@@ -26,7 +27,8 @@ export function App() {
         <Route path="/" element={<SplashScreen />} />
         {/* Home moved from / to /home to make room for Splash at root */}
         <Route path="/home" element={<HomeScreen />} />
-        <Route path="/leaderboard" element={<LeaderboardScreen />} />
+        <Route path="/leaderboard" element={<ArenasHubScreen />} />
+        <Route path="/leaderboard/:category" element={<CategoryLeaderboardScreen />} />
         <Route path="/explore" element={<PlaceholderScreen title="Explore" note="Port next using the Home/Leaderboard patterns." />} />
         <Route path="/profile" element={<PlaceholderScreen title="Profile" note="Port next: agent profile with orbit avatar + stats." />} />
         <Route path="/profile/:agent" element={<ProfileScreen />} />

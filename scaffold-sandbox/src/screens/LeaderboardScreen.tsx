@@ -1,3 +1,11 @@
+// DEPRECATED — LeaderboardScreen is no longer wired to any route.
+// It has been superseded by the 2-level Arenas hub:
+//   /leaderboard        → ArenasHubScreen.tsx
+//   /leaderboard/:cat   → CategoryLeaderboardScreen.tsx
+//
+// Retained (not deleted) as a design reference for the old "agents as
+// competitors" premise. Safe to delete once the new hub is confirmed stable.
+
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { NavLink } from 'react-router-dom';
