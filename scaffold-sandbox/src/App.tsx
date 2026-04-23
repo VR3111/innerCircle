@@ -13,6 +13,7 @@ import { NotificationsScreen } from './screens/NotificationsScreen';
 import { AuthScreen } from './screens/AuthScreen';
 import { PlaceholderScreen } from './screens/PlaceholderScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
+import { ComposeScreen } from './screens/ComposeScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { PaywallScreen } from './screens/PaywallScreen';
 
@@ -37,7 +38,7 @@ export function App() {
         <Route path="/post/:id" element={<PostDetailScreen />} />
         <Route path="/notifications" element={<NotificationsScreen />} />
         <Route path="/settings" element={<SettingsScreen />} />
-        <Route path="/compose" element={<PlaceholderScreen title="Compose" />} />
+        <Route path="/compose" element={<ComposeScreen />} />
         <Route path="/dms" element={<PlaceholderScreen title="Messages" note="Inner Circle only." />} />
         <Route path="/dm/:agent" element={<PlaceholderScreen title="DM Thread" />} />
         <Route path="/paywall" element={<PaywallScreen />} />
