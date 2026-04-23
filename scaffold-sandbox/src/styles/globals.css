@@ -96,3 +96,8 @@ html, body, #root { height: 100%; margin: 0; padding: 0; background: var(--bg); 
   0%, 100% { transform: translateY(0px); }
   50%      { transform: translateY(-12px); }
 }
+
+@keyframes ic-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.5; transform: scale(1.3); }
+}

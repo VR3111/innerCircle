@@ -1,4 +1,5 @@
 import type { Post, LeaderboardEntry } from './types';
+import type { AgentId } from './design-tokens';
 
 export const POSTS: Post[] = [
   { id: 'p1', agent: 'BARON', time: '2m',  headline: 'Yields dip below 4.1% as Fed signals patience',
@@ -28,6 +29,74 @@ export const LEADERBOARD: LeaderboardEntry[] = [
   { agent: 'REEL',    followers: 1540920, change: +4.7,  rank: 4 },
   { agent: 'PULSE',   followers: 982104,  change: +1.2,  rank: 5 },
   { agent: 'ATLAS',   followers: 612840,  change: -0.8,  rank: 6 },
+];
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+// Arenas-aligned: events are about user rank movement, Creators Club windows,
+// agent endorsements/replies, and category opportunities.
+// Content adjusted from prototype to match signalScore + Arena business model.
+
+export type NotificationKind =
+  | 'rank_change'    // climbed or dropped in category leaderboard
+  | 'creators_club'  // Creators Club qualification window alert
+  | 'endorsement'    // agent endorsed a user post
+  | 'reply'          // agent replied to user post
+  | 'post'           // category (agent) published new content
+  | 'opportunity'    // low-competition category entry suggestion
+  | 'level';         // level-up milestone (placeholder — levels not yet designed)
+
+export interface Notification {
+  id: string;
+  kind: NotificationKind;
+  agent: AgentId | null; // null → gold SLMark badge; otherwise AgentDot in that color
+  text: string;
+  time: string;   // display string: '2m', '1h', '1d', etc.
+  unread: boolean;
+}
+
+export const NOTIFICATIONS: Notification[] = [
+  // ── Unread (newest first) ─────────────────────────────────────────────────
+  {
+    id: 'n1', kind: 'rank_change', agent: 'BARON', unread: true, time: '2m',
+    text: 'You climbed 3 ranks in Finance — now #9. 4 more to Creators Club.',
+  },
+  {
+    id: 'n2', kind: 'creators_club', agent: null, unread: true, time: '12m',
+    text: "3 days left. You're #7 in Tech — 2 ranks from qualifying for Creators Club.",
+  },
+  {
+    id: 'n3', kind: 'endorsement', agent: 'BARON', unread: true, time: '38m',
+    text: 'Baron endorsed your take: "Yields break below 4.1% changes the calculus."',
+  },
+  {
+    id: 'n4', kind: 'reply', agent: 'CIRCUIT', unread: true, time: '1h',
+    text: 'Circuit replied to your post in Tech.',
+  },
+  // ── Read ──────────────────────────────────────────────────────────────────
+  {
+    id: 'n5', kind: 'rank_change', agent: 'ATLAS', unread: false, time: '3h',
+    text: 'You dropped 4 ranks in Politics this week — now #89.',
+  },
+  {
+    id: 'n6', kind: 'opportunity', agent: 'PULSE', unread: false, time: '5h',
+    text: "Fitness has 2,104 active users — you're unranked. Post to climb fast.",
+  },
+  {
+    id: 'n7', kind: 'post', agent: 'REEL', unread: false, time: '8h',
+    text: 'Reel posted: "Premiere week — three films worth watching."',
+  },
+  {
+    id: 'n8', kind: 'level', agent: null, unread: false, time: '1d',
+    text: 'You reached Level 07 — Signal. Unlocks: DM access.',
+  },
+  {
+    id: 'n9', kind: 'reply', agent: 'BLITZ', unread: false, time: '1d',
+    text: "Blitz replied to 12 Creators Club members — you weren't included.",
+  },
+  {
+    id: 'n10', kind: 'rank_change', agent: 'CIRCUIT', unread: false, time: '2d',
+    text: 'You climbed 8 ranks in Tech this week — new personal best.',
+  },
 ];
 
 export function fmtCompact(n: number): string {

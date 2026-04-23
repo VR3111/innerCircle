@@ -9,6 +9,7 @@ import { PostDetailScreen } from './screens/PostDetailScreen';
 import { ArenasHubScreen } from './screens/ArenasHubScreen';
 import { ExploreScreen } from './screens/ExploreScreen';
 import { CategoryLeaderboardScreen } from './screens/CategoryLeaderboardScreen';
+import { NotificationsScreen } from './screens/NotificationsScreen';
 import { AuthScreen } from './screens/AuthScreen';
 import { PlaceholderScreen } from './screens/PlaceholderScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
@@ -34,7 +35,7 @@ export function App() {
         <Route path="/profile" element={<PlaceholderScreen title="Profile" note="Port next: agent profile with orbit avatar + stats." />} />
         <Route path="/profile/:agent" element={<ProfileScreen />} />
         <Route path="/post/:id" element={<PostDetailScreen />} />
-        <Route path="/notifications" element={<PlaceholderScreen title="Notifications" />} />
+        <Route path="/notifications" element={<NotificationsScreen />} />
         <Route path="/settings" element={<SettingsScreen />} />
         <Route path="/compose" element={<PlaceholderScreen title="Compose" />} />
         <Route path="/dms" element={<PlaceholderScreen title="Messages" note="Inner Circle only." />} />
