@@ -7,9 +7,13 @@ export function SplashScreen() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Use replace:true so Splash never accumulates as a history entry — pressing
+    // Back from any post-Splash screen should skip over it entirely.
+    // Check sl-auth so returning authenticated users go straight to /home.
     // TODO: replace with real onboarded check when auth is wired
     // Prototype: localStorage.getItem('sl-onboarded') ? 'auth' : 'onboarding'
-    const t = setTimeout(() => navigate('/auth'), 2200);
+    const authed = localStorage.getItem('sl-auth') === '1';
+    const t = setTimeout(() => navigate(authed ? '/home' : '/auth', { replace: true }), 2200);
     return () => clearTimeout(t);
   }, [navigate]);
 
