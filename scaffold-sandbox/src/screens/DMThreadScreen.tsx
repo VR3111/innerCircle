@@ -66,6 +66,12 @@ function generateAgentReply(agentId: string): string {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes >= 1024)         return `${Math.round(bytes / 1024)} KB`;
+  return `${bytes} B`;
+}
+
 // ── useLongPress ──────────────────────────────────────────────────────────────
 // Returns pointer-event handlers to spread on any element.
 // onTrigger fires after `delay` ms of stationary press (movement > 10px cancels).
@@ -187,7 +193,9 @@ function ActionMenuOverlay({ msg, anchorRect, agentColor: _agentColor, onReact, 
   }, [onClose]);
 
   const handleCopy = () => {
-    navigator.clipboard?.writeText(msg.text ?? '').catch(() => {/* silent */});
+    // For attachment messages: copy filename rather than URL
+    const copyText = msg.attachment?.name ?? msg.text ?? '';
+    navigator.clipboard?.writeText(copyText).catch(() => {/* silent */});
     onClose();
   };
 
@@ -322,6 +330,95 @@ function ReplyArrow({ visible, side }: { visible: boolean; side: 'left' | 'right
           : <path d="M15 17l5-5-5-5M20 12H9a5 5 0 000 10h1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
         }
       </svg>
+    </div>
+  );
+}
+
+// ── AttachmentBubble ──────────────────────────────────────────────────────────
+// Renders inside a message bubble when msg.attachment is present.
+// Handles photo display (with imageError fallback) and file chip.
+
+interface AttachmentBubbleProps {
+  attachment: NonNullable<DMMessage['attachment']>;
+  hasText: boolean;
+  isMe: boolean;
+}
+
+function AttachmentBubble({ attachment, hasText, isMe }: AttachmentBubbleProps) {
+  const [imageError, setImageError] = useState(false);
+
+  const handleClick = () => {
+    if (attachment.url === '#') {
+      // TODO: Backend file fetch — mock attachment has no real URL
+      console.log('Attachment preview not available in mock');
+      return;
+    }
+    window.open(attachment.url);
+  };
+
+  // Photo — render as image; fall through to file chip on error
+  if (attachment.type === 'photo' && !imageError) {
+    return (
+      <img
+        src={attachment.url}
+        alt={attachment.name ?? 'photo'}
+        draggable={false}
+        onError={() => setImageError(true)}
+        onClick={handleClick}
+        style={{
+          display: 'block',
+          maxWidth: 240,
+          maxHeight: 320,
+          width: '100%',
+          objectFit: 'cover',
+          cursor: 'pointer',
+          // marginBottom applies spacing before text that follows
+          marginBottom: hasText ? 0 : 0,
+          // border-radius is provided by parent's overflow:hidden — no border-radius here
+        }}
+      />
+    );
+  }
+
+  // File attachment or photo load failure → chip layout
+  const name = attachment.name ?? 'file';
+  const displayName = name.length > 22 ? name.slice(0, 22) + '…' : name;
+  // On me-bubbles (gradient bg) use dark tints; on others use light
+  const chipBg    = isMe ? 'rgba(0,0,0,0.14)'            : 'rgba(255,255,255,0.07)';
+  const chipText  = isMe ? 'rgba(10,10,10,0.9)'           : TOKENS.text;
+  const chipMuted = isMe ? 'rgba(10,10,10,0.55)'          : TOKENS.mute2;
+
+  return (
+    <div
+      onClick={handleClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '6px 8px', borderRadius: 8,
+        background: chipBg,
+        marginBottom: hasText ? 6 : 0,
+        cursor: 'pointer',
+      }}
+    >
+      {/* File icon */}
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+        style={{ color: chipMuted, flexShrink: 0 }}>
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"
+          stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/>
+        <polyline points="14,2 14,8 20,8"
+          stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/>
+      </svg>
+      <span style={{
+        fontFamily: FONT, fontSize: 13, fontWeight: 500,
+        color: chipText, flex: 1,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {displayName}
+      </span>
+      {attachment.size && (
+        <span style={{ fontFamily: MONO, fontSize: 10, color: chipMuted, flexShrink: 0 }}>
+          {attachment.size}
+        </span>
+      )}
     </div>
   );
 }
@@ -484,6 +581,11 @@ function MessageBubble({
         : 'User'
     : '';
 
+  // ── Attachment layout helpers ─────────────────────────────────────────────
+  const att          = msg.attachment ?? null;
+  const isPhotoOnly  = att?.type === 'photo' && !msg.text;
+  const hasAtt       = att !== null;
+
   // ── Reactions grouped ─────────────────────────────────────────────────────
   const reactionGroups = (msg.reactions ?? []).reduce<Map<string, { count: number; byMe: boolean }>>(
     (acc, r) => {
@@ -564,15 +666,27 @@ function MessageBubble({
         <ReplyArrow visible={showReplyArrow} side={isMe ? 'right' : 'left'} />
 
         <div style={{
-          padding: '10px 14px',
+          // Photo-only: transparent shell — photo is clipped to border-radius via overflow:hidden
+          // Photo+text or file: normal bubble appearance
+          padding: hasAtt && att!.type === 'photo' ? '0' : '10px 14px',
           borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-          background: bubbleBg,
+          background: isPhotoOnly ? 'transparent' : bubbleBg,
           color: isMe ? '#0A0A0A' : TOKENS.text,
-          border: bubbleBorder,
+          border: isPhotoOnly ? 'none' : bubbleBorder,
           fontFamily: FONT, fontSize: 14, lineHeight: 1.45,
-          boxShadow: bubbleShadow,
+          boxShadow: isPhotoOnly ? 'none' : bubbleShadow,
+          // overflow:hidden lets border-radius clip the photo to the bubble shape
+          overflow: hasAtt && att!.type === 'photo' ? 'hidden' : 'visible',
         }}>
-          {msg.text}
+          {/* Attachment — renders above text when both present */}
+          {att && <AttachmentBubble attachment={att} hasText={!!msg.text} isMe={isMe} />}
+
+          {/* Text — photo+text gets extra padding since photo has none */}
+          {msg.text ? (
+            att?.type === 'photo'
+              ? <div style={{ padding: '6px 14px 10px', lineHeight: 1.45 }}>{msg.text}</div>
+              : msg.text
+          ) : null}
         </div>
       </div>
 
@@ -703,6 +817,12 @@ export function DMThreadScreen() {
   // Fix 1: agent-pending tracks the window between user sending and agent reply arriving
   const [agentPending, setAgentPending] = useState(false);
 
+  // Part 2c: pending attachment before send
+  const [pendingAttachment, setPendingAttachment] = useState<{
+    type: 'photo' | 'file'; name: string; url: string; size: string; isLarge: boolean;
+  } | null>(null);
+  const [plusHovered, setPlusHovered] = useState(false);
+
   // Fix 2: free-user quota counter for agent threads
   const [sentCount, setSentCount] = useState<number>(() => {
     if (!isAgentThread || !agentQuotaKey || isPremium) return 0;
@@ -727,6 +847,14 @@ export function DMThreadScreen() {
   const waitingForReply = isUserThread && consecutiveMeCount >= USER_TURN_LIMIT;
   // Composer is fully locked (no input allowed)
   const composerLocked = quotaExhausted || waitingForReply;
+  // Send is valid when there's text OR a pending attachment (premium only for attachment)
+  const canSend = !!(text.trim() || pendingAttachment) && !waitingForReply;
+  // + button color: locked/dim for free users; gold on hover when premium and active
+  const plusColor = !isPremium
+    ? (quotaExhausted ? TOKENS.mute3 : TOKENS.mute)
+    : agentPending || composerLocked
+      ? TOKENS.mute2
+      : plusHovered ? TOKENS.gold : TOKENS.mute;
 
   // ── Refs ───────────────────────────────────────────────────────────────────
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -737,6 +865,11 @@ export function DMThreadScreen() {
   const pendingReplyTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Message element map for scroll-to-original
   const msgRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  // File picker ref (hidden input)
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // Tracks the object URL of a pending attachment so we can revoke it on remove/unmount
+  // Cleared to null after send (URL still needed for the bubble renderer)
+  const pendingAttachmentUrlRef = useRef<string | null>(null);
 
   const registerRef = useCallback((id: string, el: HTMLDivElement | null) => {
     if (el) msgRefs.current.set(id, el);
@@ -746,7 +879,7 @@ export function DMThreadScreen() {
   // ── Effects ────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [msgs.length, typing]);
+  }, [msgs.length, typing, replyingTo]);
 
   useEffect(() => {
     if (!showMenu) return;
@@ -757,11 +890,12 @@ export function DMThreadScreen() {
     return () => document.removeEventListener('mousedown', handler);
   }, [showMenu]);
 
-  // Cleanup timers on unmount so they don't fire after navigation
+  // Cleanup timers and any unsent attachment blob URL on unmount
   useEffect(() => {
     return () => {
-      if (pendingTypingTimer.current) clearTimeout(pendingTypingTimer.current);
-      if (pendingReplyTimer.current)  clearTimeout(pendingReplyTimer.current);
+      if (pendingTypingTimer.current)    clearTimeout(pendingTypingTimer.current);
+      if (pendingReplyTimer.current)     clearTimeout(pendingReplyTimer.current);
+      if (pendingAttachmentUrlRef.current) URL.revokeObjectURL(pendingAttachmentUrlRef.current);
     };
   }, []);
 
@@ -816,18 +950,69 @@ export function DMThreadScreen() {
     setTimeout(() => setHighlightedId(null), 700);
   }, []);
 
+  // ── Part 2c: attachment handlers ──────────────────────────────────────────
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Revoke previous unsent attachment URL before creating a new one
+    if (pendingAttachmentUrlRef.current) URL.revokeObjectURL(pendingAttachmentUrlRef.current);
+    const url = URL.createObjectURL(file);
+    pendingAttachmentUrlRef.current = url;
+    setPendingAttachment({
+      type: file.type.startsWith('image/') ? 'photo' : 'file',
+      name: file.name,
+      url,
+      size: formatFileSize(file.size),
+      isLarge: file.size > 10 * 1024 * 1024,
+    });
+    // Reset so the same file can be re-selected after removal
+    e.target.value = '';
+  };
+
+  const handleRemoveAttachment = () => {
+    if (pendingAttachmentUrlRef.current) {
+      URL.revokeObjectURL(pendingAttachmentUrlRef.current);
+      pendingAttachmentUrlRef.current = null;
+    }
+    setPendingAttachment(null);
+  };
+
+  const handlePlusClick = () => {
+    if (!isPremium) {
+      // TODO: Post-backend: pass attachment intent so paywall shows 'Unlock attachments'
+      navigate('/paywall');
+      return;
+    }
+    // No-op while agent is composing or composer is locked
+    if (agentPending || composerLocked) return;
+    fileInputRef.current?.click();
+  };
+
   // ── Send ───────────────────────────────────────────────────────────────────
   const send = () => {
-    if (!text.trim() || composerLocked || agentPending) return;
+    const hasContent = !!(text.trim() || pendingAttachment);
+    if (!hasContent || composerLocked || agentPending) return;
 
     const msgId  = 'm' + Date.now();
     const newMsg: DMMessage = {
-      id: msgId, from: 'me', text: text.trim(), time: 'now', status: 'sending',
-      ...(replyingTo ? { replyTo: replyingTo.id } : {}),
+      id: msgId, from: 'me', time: 'now', status: 'sending',
+      ...(text.trim()        ? { text: text.trim() }                                                    : {}),
+      ...(replyingTo         ? { replyTo: replyingTo.id }                                               : {}),
+      ...(pendingAttachment  ? { attachment: {
+          type: pendingAttachment.type,
+          name: pendingAttachment.name,
+          url:  pendingAttachment.url,
+          size: pendingAttachment.size,
+        }} : {}),
     };
     setMsgs(m => [...m, newMsg]);
     setText('');
     setReplyingTo(null);
+    setPendingAttachment(null);
+    // Don't revoke the blob URL — the bubble renderer still needs it.
+    // Clear the ref so unmount cleanup doesn't revoke it either.
+    pendingAttachmentUrlRef.current = null;
 
     // Status progression
     setTimeout(() => setMsgs(m => m.map(msg => msg.id === msgId ? { ...msg, status: 'sent' }      : msg)), 300);
@@ -1117,12 +1302,9 @@ export function DMThreadScreen() {
         borderTop: `1px solid ${TOKENS.line}`,
         flexShrink: 0,
       }}>
-        {/* ── Fix 2: quota counter (free agent threads, 1-3 remaining) ── */}
+        {/* Quota counter (free agent threads, 1-3 remaining) */}
         {showCounter && (
-          <div style={{
-            padding: '5px 18px 0',
-            display: 'flex', justifyContent: 'flex-end',
-          }}>
+          <div style={{ padding: '5px 18px 0', display: 'flex', justifyContent: 'flex-end' }}>
             <span style={{
               fontFamily: MONO, fontSize: 10, letterSpacing: 1.2,
               color: remaining === 1 ? TOKENS.down : TOKENS.mute2,
@@ -1132,17 +1314,89 @@ export function DMThreadScreen() {
           </div>
         )}
 
-        {/* ── Fix 3: user-thread waiting label ── */}
+        {/* User-thread waiting label */}
         {waitingForReply && (
-          <div style={{
-            padding: '5px 18px 0',
-            display: 'flex', justifyContent: 'center',
-          }}>
-            <span style={{
-              fontFamily: MONO, fontSize: 10, letterSpacing: 1.4, color: TOKENS.mute2,
-            }}>
+          <div style={{ padding: '5px 18px 0', display: 'flex', justifyContent: 'center' }}>
+            <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: 1.4, color: TOKENS.mute2 }}>
               WAITING FOR REPLY
             </span>
+          </div>
+        )}
+
+        {/* Pending attachment preview — photo thumbnail or file chip */}
+        {pendingAttachment && (
+          <div style={{ padding: '8px 14px 0' }}>
+            {pendingAttachment.type === 'photo' ? (
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <img
+                  src={pendingAttachment.url}
+                  alt={pendingAttachment.name}
+                  style={{
+                    width: 64, height: 64, objectFit: 'cover',
+                    borderRadius: 8, display: 'block',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleRemoveAttachment}
+                  style={{
+                    position: 'absolute', top: 3, right: 3,
+                    width: 18, height: 18, borderRadius: '50%',
+                    background: 'rgba(0,0,0,0.65)', border: 'none', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#fff', fontSize: 9, lineHeight: 1,
+                  }}
+                >✕</button>
+                {pendingAttachment.isLarge && (
+                  <div style={{
+                    marginTop: 3, fontFamily: MONO, fontSize: 9,
+                    color: TOKENS.down, letterSpacing: 0.8,
+                  }}>
+                    ⚠ Large file — may fail
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* File chip preview */
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                background: 'rgba(255,255,255,0.04)',
+                border: `1px solid ${TOKENS.line}`,
+                borderRadius: 10, padding: 8,
+              }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
+                  style={{ color: TOKENS.mute, flexShrink: 0 }}>
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"
+                    stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/>
+                  <polyline points="14,2 14,8 20,8"
+                    stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/>
+                </svg>
+                <span style={{
+                  fontFamily: FONT, fontSize: 13, color: TOKENS.text, flex: 1,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {pendingAttachment.name.length > 28
+                    ? pendingAttachment.name.slice(0, 28) + '…'
+                    : pendingAttachment.name}
+                </span>
+                <span style={{ fontFamily: MONO, fontSize: 10, color: TOKENS.mute2, flexShrink: 0 }}>
+                  {pendingAttachment.size}
+                </span>
+                {pendingAttachment.isLarge && (
+                  <span style={{ fontFamily: MONO, fontSize: 9, color: TOKENS.down }}>⚠</span>
+                )}
+                <button
+                  type="button"
+                  onClick={handleRemoveAttachment}
+                  style={{
+                    width: 20, height: 20, borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.08)', border: 'none', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: TOKENS.mute2, flexShrink: 0, fontSize: 10,
+                  }}
+                >✕</button>
+              </div>
+            )}
           </div>
         )}
 
@@ -1154,27 +1408,37 @@ export function DMThreadScreen() {
           padding: '8px 8px 8px 14px',
           margin: `10px 14px calc(16px + var(--ic-bot-inset,0px))`,
         }}>
-          {/* Paperclip — disabled (→ paywall) when quota exhausted */}
+          {/* + (attachment) button — replaces paperclip */}
           <button
             type="button"
-            onClick={quotaExhausted ? () => navigate('/paywall') : () => { /* TODO Part 2c: attachment menu */ }}
+            onClick={handlePlusClick}
+            onMouseEnter={() => setPlusHovered(true)}
+            onMouseLeave={() => setPlusHovered(false)}
             style={{
               width: 28, height: 28, borderRadius: '50%',
               background: 'transparent', border: 'none',
-              cursor: 'pointer',
-              color: quotaExhausted ? TOKENS.mute3 : TOKENS.mute,
-              opacity: quotaExhausted ? 0.4 : 1,
+              cursor: 'pointer', color: plusColor,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0,
+              flexShrink: 0, transition: 'color 150ms',
             }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"
-                stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5"  y1="12" x2="19" y2="12"/>
             </svg>
           </button>
 
-          {/* Input — locked when quota exhausted or waiting for reply */}
+          {/* Hidden native file picker — triggered by + button for premium users */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="*/*"
+            onChange={handleFileChange}
+            style={{ display: 'none' }}
+          />
+
+          {/* Text input */}
           <input
             ref={inputRef}
             value={text}
@@ -1182,8 +1446,8 @@ export function DMThreadScreen() {
             onKeyDown={e => e.key === 'Enter' && !composerLocked && send()}
             readOnly={composerLocked}
             placeholder={
-              quotaExhausted   ? 'Upgrade to Inner Circle to continue' :
-              waitingForReply  ? 'Waiting for reply...' :
+              quotaExhausted  ? 'Upgrade to Inner Circle to continue' :
+              waitingForReply ? 'Waiting for reply...' :
               `Message ${displayName}…`
             }
             style={{
@@ -1197,36 +1461,34 @@ export function DMThreadScreen() {
 
           {/* ── Send / Stop / Lock button ── */}
           {agentPending ? (
-            // Fix 1: Stop button — cancels pending agent reply
+            // Stop button — cancels pending agent reply
             <button type="button" onClick={stopReply} style={goldBtnStyle}>
-              {/* Rounded-square stop icon (Claude-style) */}
               <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
                 <rect x="0.5" y="0.5" width="12" height="12" rx="3" fill="currentColor"/>
               </svg>
             </button>
           ) : quotaExhausted ? (
-            // Fix 2: Lock button — navigates to paywall
+            // Lock button — navigates to paywall
             <button type="button" onClick={() => navigate('/paywall')} style={goldBtnStyle}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                 <rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="2"/>
-                <path d="M7 11V7a5 5 0 0110 0v4"
-                  stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
               </svg>
             </button>
           ) : (
-            // Normal send button
+            // Normal send button — active when text OR attachment present
             <button
               type="button"
               onClick={send}
-              disabled={!text.trim() || waitingForReply}
+              disabled={!canSend}
               style={{
                 ...sendBtnBase,
-                cursor: (text.trim() && !waitingForReply) ? 'pointer' : 'default',
-                background: (text.trim() && !waitingForReply)
+                cursor: canSend ? 'pointer' : 'default',
+                background: canSend
                   ? 'linear-gradient(135deg, #F4D47C 0%, #D4AF37 100%)'
                   : 'rgba(255,255,255,0.08)',
-                color: (text.trim() && !waitingForReply) ? '#0A0A0A' : TOKENS.mute2,
-                boxShadow: (text.trim() && !waitingForReply) ? '0 4px 12px rgba(212,175,55,0.35)' : 'none',
+                color: canSend ? '#0A0A0A' : TOKENS.mute2,
+                boxShadow: canSend ? '0 4px 12px rgba(212,175,55,0.35)' : 'none',
               }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none">

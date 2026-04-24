@@ -145,6 +145,24 @@ export type DMMessage = {
 
 // ─── DM mock data ─────────────────────────────────────────────────────────────
 
+// Inline SVG chart — replaces external via.placeholder.com (unreachable). encodeURIComponent
+// handles all Unicode (including →) so no btoa latin-1 issues.
+const CHART_PLACEHOLDER_SVG = 'data:image/svg+xml,' + encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">' +
+  '<rect width="400" height="300" fill="#1a1a1a"/>' +
+  '<g stroke="#444" stroke-width="1" fill="none">' +
+  '<line x1="0" y1="60" x2="400" y2="60"/>' +
+  '<line x1="0" y1="120" x2="400" y2="120"/>' +
+  '<line x1="0" y1="180" x2="400" y2="180"/>' +
+  '<line x1="0" y1="240" x2="400" y2="240"/>' +
+  '</g>' +
+  '<polyline points="20,220 80,180 140,200 200,140 260,160 320,100 380,120"' +
+  ' stroke="#E63946" stroke-width="2" fill="none"/>' +
+  '<text x="20" y="30" fill="#888" font-family="monospace" font-size="11">10Y TREASURY \u00b7 4.05 \u2192 3.98</text>' +
+  '<text x="20" y="285" fill="#555" font-family="monospace" font-size="9">5D CHART</text>' +
+  '</svg>'
+);
+
 export const DM_THREADS: DMThread[] = [
   { id: 't1', kind: 'agent', agent: 'BARON',   online: true,  muted: false, locked: false,
     last: 'Nina — size into it at 60% of intended.',             time: '1m',  unread: 2 },
@@ -174,6 +192,10 @@ export const DM_MESSAGES: Record<string, DMMessage[]> = {
     { id: 'm3', from: 'agent', text: "Shifts the calculus, doesn't flip it. Tech is still expensive on 12M fwd. Add slowly.", time: '9:44',
       reactions: [{ emoji: '🔥', from: 'me' }, { emoji: '🔥', from: 'them' }, { emoji: '👏', from: 'them' }] },
     { id: 'm4', from: 'agent', text: "My guidance: 60% of intended on open, add on strength above yesterday's high.",         time: '9:44' },
+    { id: 'm-attach', from: 'agent', time: '9:47',
+      attachment: { type: 'photo', name: 'chart-snapshot.png',
+        url: CHART_PLACEHOLDER_SVG },
+      text: "Here's what I'm seeing on the 10Y chart." },
     { id: 'm5', from: 'me',    text: 'Understood. Any hedge you\'d pair with it?',                                            time: '9:45', status: 'read',
       reactions: [{ emoji: '❤️', from: 'them' }] },
     { id: 'm6', from: 'agent', text: "Modest vol hedge through month-end. The chop isn't done.",                              time: '9:46',
@@ -184,6 +206,9 @@ export const DM_MESSAGES: Record<string, DMMessage[]> = {
     { id: 'c1', from: 'agent', text: 'The pricing page quietly shipped agents v2.',                     time: '9:41' },
     { id: 'c2', from: 'me',    text: "Yeah — I noticed. Any read on what changed?",                    time: '9:42', status: 'read' },
     { id: 'c3', from: 'agent', text: 'The inference tier is the tell. Check the GitHub activity first.', time: '9:44' },
+    { id: 'm-file', from: 'agent', time: '10:06',
+      attachment: { type: 'file', name: 'pricing_analysis_q4.pdf', url: '#', size: '1.2 MB' },
+      text: 'Full breakdown attached.' },
   ],
   // PULSE — 3 messages
   t3: [
