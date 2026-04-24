@@ -130,6 +130,12 @@ export function UserProfileScreen() {
   const displayedFollowers = user.followers + (following ? 1 : 0);
   const visibleBadges = user.arenaBadges.filter(b => b.rank <= 100).slice(0, 3);
 
+  // Find DM thread for this handle (only relevant when premium)
+  const dmThread = isPremium
+    ? DM_THREADS.find(t => t.kind === 'user' && t.userHandle === handle)
+    : undefined;
+  const hasThread = dmThread !== undefined;
+
   const avatarRingStyle: React.CSSProperties = user.creatorsClub
     ? { boxShadow: `0 0 0 2.5px ${TOKENS.gold}, 0 0 20px rgba(212,175,55,0.3)` }
     : user.isPremium
@@ -149,15 +155,11 @@ export function UserProfileScreen() {
       navigate('/paywall');
       return;
     }
-    // Find existing DM thread for this user handle (linear scan — small list)
-    const thread = DM_THREADS.find(t => t.kind === 'user' && t.userHandle === handle);
-    if (thread) {
-      navigate('/dm/' + thread.id);
-    } else {
-      // TODO: Create new DM thread — requires backend (no thread seeded for this handle)
-      console.warn(`No DM thread found for @${handle} — navigating to DM list`);
-      navigate('/dms');
+    // dmThread is pre-computed in derived values; if present, navigate directly
+    if (dmThread) {
+      navigate('/dm/' + dmThread.id);
     }
+    // No thread → button renders as disabled (see JSX below); no-op here
   };
 
   // ── Follow button style ───────────────────────────────────────────────────
@@ -331,6 +333,66 @@ export function UserProfileScreen() {
           </div>
         </div>
 
+        {/* ── Action buttons: Follow + Message ─────────────────────────────── */}
+        <div style={{ marginTop: 16, padding: '0 20px' }}>
+          <div style={{ display: 'flex', gap: 10 }}>
+
+            {/* Follow / Following toggle */}
+            <button
+              type="button"
+              onClick={toggleFollow}
+              onMouseEnter={() => setFollowHovered(true)}
+              onMouseLeave={() => setFollowHovered(false)}
+              style={followBtnStyle}
+            >
+              {following ? 'Following' : 'Follow'}
+            </button>
+
+            {/* Message — three states:
+                  (a) !isPremium         → paywall prompt
+                  (b) isPremium+thread   → navigate to DM thread
+                  (c) isPremium+no thread → disabled "Message unavailable"   */}
+            {isPremium && !hasThread ? (
+              <div style={{
+                flex: 1, height: 42, borderRadius: 12,
+                background: 'rgba(255,255,255,0.04)',
+                border: `1px solid ${TOKENS.line}`,
+                color: TOKENS.mute2,
+                fontFamily: FONT, fontSize: 14, fontWeight: 500,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'not-allowed',
+                userSelect: 'none',
+              }}>
+                Message unavailable
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleMessage}
+                style={{
+                  flex: 1, height: 42, borderRadius: 12,
+                  background: isPremium ? 'rgba(255,255,255,0.04)' : 'rgba(212,175,55,0.08)',
+                  border: `1px solid ${isPremium ? TOKENS.line : 'rgba(212,175,55,0.3)'}`,
+                  color: isPremium ? TOKENS.text : TOKENS.gold,
+                  fontFamily: FONT, fontSize: 14, fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}
+              >
+                {!isPremium && (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                    <rect x="3" y="11" width="18" height="11" rx="2"
+                      stroke="currentColor" strokeWidth="2"/>
+                    <path d="M7 11V7a5 5 0 0110 0v4"
+                      stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                )}
+                Message
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* ── Signal score ──────────────────────────────────────────────────── */}
         <div style={{ marginTop: 18, padding: '0 20px', position: 'relative' }}>
           <div
@@ -479,48 +541,6 @@ export function UserProfileScreen() {
             </div>
           </div>
         )}
-
-        {/* ── Action buttons: Follow + Message ─────────────────────────────── */}
-        <div style={{ marginTop: 20, padding: '0 20px' }}>
-          <div style={{ display: 'flex', gap: 10 }}>
-
-            {/* Follow / Following toggle */}
-            <button
-              type="button"
-              onClick={toggleFollow}
-              onMouseEnter={() => setFollowHovered(true)}
-              onMouseLeave={() => setFollowHovered(false)}
-              style={followBtnStyle}
-            >
-              {following ? 'Following' : 'Follow'}
-            </button>
-
-            {/* Message — premium → DM; free → paywall */}
-            <button
-              type="button"
-              onClick={handleMessage}
-              style={{
-                flex: 1, height: 42, borderRadius: 12,
-                background: isPremium ? 'rgba(255,255,255,0.04)' : 'rgba(212,175,55,0.08)',
-                border: `1px solid ${isPremium ? TOKENS.line : 'rgba(212,175,55,0.3)'}`,
-                color: isPremium ? TOKENS.text : TOKENS.gold,
-                fontFamily: FONT, fontSize: 14, fontWeight: 500,
-                cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              }}
-            >
-              {!isPremium && (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                  <rect x="3" y="11" width="18" height="11" rx="2"
-                    stroke="currentColor" strokeWidth="2"/>
-                  <path d="M7 11V7a5 5 0 0110 0v4"
-                    stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                </svg>
-              )}
-              Message
-            </button>
-          </div>
-        </div>
 
         {/* ── Post grid ────────────────────────────────────────────────────── */}
         <div style={{ marginTop: 24 }}>

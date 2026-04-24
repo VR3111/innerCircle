@@ -109,13 +109,21 @@ function ThreadRow({ thread, i, isPremium, onNavigate }: ThreadRowProps) {
         {A ? (
           <AgentDot agent={thread.agent!} size={44} clickable={false} />
         ) : (
-          <div style={{
-            width: 44, height: 44, borderRadius: '50%',
-            background: 'linear-gradient(135deg, #2a2a2a, #121212)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: FONT, fontWeight: 700, fontSize: 16, color: TOKENS.text,
-            border: `1px solid ${TOKENS.line2}`,
-          }}>
+          // User thread: avatar taps → /profile/:handle (stopPropagation keeps row → /dm/:id)
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              onNavigate('/profile/' + thread.userHandle);
+            }}
+            style={{
+              width: 44, height: 44, borderRadius: '50%',
+              background: 'linear-gradient(135deg, #2a2a2a, #121212)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontFamily: FONT, fontWeight: 700, fontSize: 16, color: TOKENS.text,
+              border: `1px solid ${TOKENS.line2}`,
+              cursor: 'pointer',
+            }}
+          >
             {thread.userInitials}
           </div>
         )}

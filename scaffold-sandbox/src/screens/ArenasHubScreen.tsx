@@ -11,7 +11,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AGENTS, AGENT_ORDER, TOKENS } from '@/lib/design-tokens';
 import { AgentDot, LivePulse } from '@/components/primitives';
-import { fmtCompact } from '@/lib/mock-data';
+import { fmtCompact, MOCK_USERS } from '@/lib/mock-data';
 import { LEADERBOARD_DATA, type CategoryAgentId } from '@/lib/leaderboard-mock';
 
 // ─── Category card ─────────────────────────────────────────────────────────────
@@ -19,9 +19,11 @@ import { LEADERBOARD_DATA, type CategoryAgentId } from '@/lib/leaderboard-mock';
 function CategoryCard({
   agentId,
   onClick,
+  onUserTap,
 }: {
   agentId: CategoryAgentId;
   onClick: () => void;
+  onUserTap: (handle: string) => void;
 }) {
   const A = AGENTS[agentId];
   const data = LEADERBOARD_DATA[agentId];
@@ -69,26 +71,31 @@ function CategoryCard({
           {fmtCompact(data.activeUsers)} ACTIVE · +{data.weeklyGrowthPct}%
         </div>
 
-        {/* Top 3 stacked avatar circles */}
+        {/* Top 3 stacked avatar circles — tappable for handles in MOCK_USERS */}
         <div style={{ display: 'flex', marginTop: 9 }}>
-          {top3.map((u, i) => (
-            <div
-              key={u.id}
-              style={{
-                width: 24, height: 24, borderRadius: '50%',
-                background: TOKENS.line2,
-                border: `2px solid ${TOKENS.bg}`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontFamily: 'Inter, system-ui, sans-serif',
-                fontSize: 8.5, fontWeight: 700, color: TOKENS.text,
-                marginLeft: i > 0 ? -8 : 0,
-                position: 'relative', zIndex: 3 - i,
-                flexShrink: 0,
-              }}
-            >
-              {u.initials}
-            </div>
-          ))}
+          {top3.map((u, i) => {
+            const hasProfle = Boolean(MOCK_USERS[u.handle]);
+            return (
+              <div
+                key={u.id}
+                onClick={hasProfle ? (e) => { e.stopPropagation(); onUserTap(u.handle); } : undefined}
+                style={{
+                  width: 24, height: 24, borderRadius: '50%',
+                  background: TOKENS.line2,
+                  border: `2px solid ${TOKENS.bg}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: 'Inter, system-ui, sans-serif',
+                  fontSize: 8.5, fontWeight: 700, color: TOKENS.text,
+                  marginLeft: i > 0 ? -8 : 0,
+                  position: 'relative', zIndex: 3 - i,
+                  flexShrink: 0,
+                  cursor: hasProfle ? 'pointer' : 'default',
+                }}
+              >
+                {u.initials}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -176,8 +183,7 @@ function CountdownBanner({ daysLeft }: { daysLeft: number }) {
 
 // ─── Featured creator card ─────────────────────────────────────────────────────
 
-function FeaturedCreatorCard() {
-  // TODO: wire up onClick → navigate('/profile/:handle') once user profile routes exist
+function FeaturedCreatorCard({ onProfile }: { onProfile: (handle: string) => void }) {
   return (
     <div style={{
       marginTop: 16,
@@ -195,10 +201,14 @@ function FeaturedCreatorCard() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <AgentDot agent="BARON" size={36} clickable={false} />
         <div style={{ flex: 1 }}>
-          <span style={{
-            fontFamily: 'Inter, system-ui, sans-serif',
-            fontSize: 15, fontWeight: 600, color: TOKENS.text,
-          }}>
+          <span
+            onClick={() => onProfile('devon_w')}
+            style={{
+              fontFamily: 'Inter, system-ui, sans-serif',
+              fontSize: 15, fontWeight: 600, color: TOKENS.text,
+              cursor: 'pointer',
+            }}
+          >
             @devon_w
           </span>
           {' '}
@@ -284,12 +294,13 @@ export function ArenasHubScreen() {
               key={agentId}
               agentId={agentId}
               onClick={() => navigate(`/leaderboard/${agentId}`)}
+              onUserTap={(handle) => navigate('/profile/' + handle)}
             />
           ))}
         </div>
 
         {/* Featured creator */}
-        <FeaturedCreatorCard />
+        <FeaturedCreatorCard onProfile={(handle) => navigate('/profile/' + handle)} />
       </div>
     </div>
   );

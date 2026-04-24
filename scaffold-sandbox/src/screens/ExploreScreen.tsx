@@ -17,7 +17,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AGENTS, AGENT_ORDER, TOKENS } from '@/lib/design-tokens';
 import { AgentDot, LivePulse, Sparkline, PlaceholderImg } from '@/components/primitives';
-import { POSTS, fmtCompact } from '@/lib/mock-data';
+import { POSTS, fmtCompact, MOCK_USERS } from '@/lib/mock-data';
 import { LEADERBOARD_DATA, type CategoryAgentId } from '@/lib/leaderboard-mock';
 
 // ─── Module-level constants (pure derivations from imported data) ─────────────
@@ -361,15 +361,18 @@ export function ExploreScreen() {
         <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {TOP_CLIMBERS.map(({ agentId, user }, i) => {
             const A = AGENTS[agentId];
+            const hasProfle = Boolean(MOCK_USERS[user.handle]);
             return (
-              // TODO: add onClick → navigate to user profile when user profiles exist
+              // Tappable for handles that exist in MOCK_USERS; others are TODO when profiles exist
               <div
                 key={`${agentId}-${user.id}`}
+                onClick={hasProfle ? () => navigate('/profile/' + user.handle) : undefined}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '12px 14px', borderRadius: 12,
                   background: 'rgba(255,255,255,0.02)',
                   border: `1px solid ${TOKENS.line}`,
+                  cursor: hasProfle ? 'pointer' : 'default',
                 }}
               >
                 {/* Rank */}

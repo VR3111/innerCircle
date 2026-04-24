@@ -54,6 +54,7 @@ export interface Notification {
   time: string;   // display string: '2m', '1h', '1d', etc.
   unread: boolean;
   link: string | null; // route to navigate on tap; null = non-navigable card
+  userHandle?: string; // if set: @handle in text is tappable → /profile/:handle
 }
 
 export const NOTIFICATIONS: Notification[] = [
@@ -108,6 +109,13 @@ export const NOTIFICATIONS: Notification[] = [
     id: 'n10', kind: 'rank_change', agent: 'CIRCUIT', unread: false, time: '2d',
     text: 'You climbed 8 ranks in Tech this week — new personal best.',
     link: '/leaderboard/CIRCUIT', // → Tech leaderboard to see position
+  },
+  // Part 2b: notification with a user reference — tests tappable @handle in text
+  {
+    id: 'n11', kind: 'reply', agent: 'BARON', unread: false, time: '3d',
+    text: '@devon_w replied to your Finance thread.',
+    link: '/post/p1',
+    userHandle: 'devon_w',
   },
 ];
 
@@ -180,7 +188,7 @@ export const DM_THREADS: DMThread[] = [
   { id: 'u1', kind: 'user',  userHandle: 'devon_w',  userInitials: 'DW',
     tierBadge: 'inner_circle', online: true,  muted: false, locked: true,
     last: 'saw your take on 10Y. want to trade notes?',           time: '4m',  unread: 3 },
-  { id: 'u2', kind: 'user',  userHandle: 'nina.j',   userInitials: 'NJ',
+  { id: 'u2', kind: 'user',  userHandle: 'nina_j',   userInitials: 'NJ',
     tierBadge: 'inner_circle', online: false, muted: true,  locked: true,
     last: 'your framing on tech was strong.',                     time: '6h',  unread: 0 },
 ];
@@ -237,7 +245,7 @@ export const DM_MESSAGES: Record<string, DMMessage[]> = {
     { id: 'u1b', from: 'me',   text: "Sure — what's your read?",                          time: '4m', status: 'read' },
     { id: 'u1c', from: 'user', text: "Think the move is overextended. Vol's compressing.", time: '3m' },
   ],
-  // nina.j — 1 message (locked + muted user thread)
+  // nina_j — 1 message (locked + muted user thread)
   u2: [
     { id: 'u2a', from: 'user', text: 'your framing on tech was strong.', time: '6h' },
   ],

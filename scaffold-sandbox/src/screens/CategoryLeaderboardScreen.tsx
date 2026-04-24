@@ -18,6 +18,7 @@ import {
   type CategoryAgentId,
   type LeaderboardUser,
 } from '@/lib/leaderboard-mock';
+import { MOCK_USERS } from '@/lib/mock-data';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -50,18 +51,22 @@ interface LeaderRowProps {
   user: LeaderboardUser;
   rank: number;
   isTop5: boolean;
+  onTap?: () => void; // defined only when user.handle exists in MOCK_USERS
 }
 
-function LeaderRow({ user, rank, isTop5 }: LeaderRowProps) {
+function LeaderRow({ user, rank, isTop5, onTap }: LeaderRowProps) {
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
-      padding: '12px 14px', borderRadius: 12,
-      background: isTop5
-        ? 'linear-gradient(90deg, rgba(244,212,124,0.08) 0%, rgba(212,175,55,0.03) 100%)'
-        : 'transparent',
-      border: isTop5 ? `1px solid ${TOKENS.gold}44` : '1px solid transparent',
-    }}>
+    <div
+      onClick={onTap}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '12px 14px', borderRadius: 12,
+        background: isTop5
+          ? 'linear-gradient(90deg, rgba(244,212,124,0.08) 0%, rgba(212,175,55,0.03) 100%)'
+          : 'transparent',
+        border: isTop5 ? `1px solid ${TOKENS.gold}44` : '1px solid transparent',
+        cursor: onTap ? 'pointer' : 'default',
+      }}>
       {/* Rank number — padded to 2 digits */}
       <span style={{
         fontFamily: 'ui-monospace, monospace',
@@ -376,7 +381,10 @@ export function CategoryLeaderboardScreen() {
             {/* Top 5 rows — gold backdrop */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {top5.map((user, i) => (
-                <LeaderRow key={user.id} user={user} rank={i + 1} isTop5 />
+                <LeaderRow
+                  key={user.id} user={user} rank={i + 1} isTop5
+                  onTap={MOCK_USERS[user.handle] ? () => navigate('/profile/' + user.handle) : undefined}
+                />
               ))}
             </div>
 
@@ -386,7 +394,10 @@ export function CategoryLeaderboardScreen() {
             {/* Ranks 6+ — normal backdrop */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {rest.map((user, i) => (
-                <LeaderRow key={user.id} user={user} rank={i + 6} isTop5={false} />
+                <LeaderRow
+                  key={user.id} user={user} rank={i + 6} isTop5={false}
+                  onTap={MOCK_USERS[user.handle] ? () => navigate('/profile/' + user.handle) : undefined}
+                />
               ))}
             </div>
           </>

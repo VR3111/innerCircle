@@ -40,7 +40,7 @@ export interface CategoryData {
 // taylor.alpha is rank 12 (index 11 in users array)
 const BARON_USERS: LeaderboardUser[] = [
   { id: 'devon_w',       handle: 'devon_w',       initials: 'DW', signalScore: 9487, change: +62 },
-  { id: 'nina.j',        handle: 'nina.j',         initials: 'NJ', signalScore: 9241, change: +34 },
+  { id: 'nina_j',        handle: 'nina_j',         initials: 'NJ', signalScore: 9241, change: +34 },
   { id: 'monetary.mav',  handle: 'monetary.mav',   initials: 'MM', signalScore: 9012, change: +18 },
   { id: 'quantrose',     handle: 'quantrose',       initials: 'QR', signalScore: 8756, change: +41 },
   { id: 'serena_k',      handle: 'serena_k',        initials: 'SK', signalScore: 8503, change: -12 },
@@ -75,7 +75,7 @@ const BLITZ_USERS: LeaderboardUser[] = [
   { id: 'priya.t',      handle: 'priya.t',      initials: 'PT', signalScore: 8490, change: +38 },
   { id: 'serena_k',     handle: 'serena_k',     initials: 'SK', signalScore: 8203, change: +14 },
   { id: 'will.b',       handle: 'will.b',       initials: 'WB', signalScore: 7887, change: -23 },
-  { id: 'nina.j',       handle: 'nina.j',       initials: 'NJ', signalScore: 7651, change:  +9 },
+  { id: 'nina_j',       handle: 'nina_j',       initials: 'NJ', signalScore: 7651, change:  +9 },
   { id: 'riley.x',      handle: 'riley.x',      initials: 'RX', signalScore: 7342, change: +55 },
   { id: 'jade.w',       handle: 'jade.w',       initials: 'JW', signalScore: 7089, change:  -4 },
   { id: 'zara.k',       handle: 'zara.k',       initials: 'ZK', signalScore: 6843, change: +31 },
@@ -100,7 +100,7 @@ const BLITZ_USERS: LeaderboardUser[] = [
 // taylor.alpha is rank 7 (index 6 in users array)
 const CIRCUIT_USERS: LeaderboardUser[] = [
   { id: 'quantrose',    handle: 'quantrose',    initials: 'QR', signalScore: 9623, change: +58 },
-  { id: 'nina.j',       handle: 'nina.j',       initials: 'NJ', signalScore: 9378, change: +42 },
+  { id: 'nina_j',       handle: 'nina_j',       initials: 'NJ', signalScore: 9378, change: +42 },
   { id: 'monetary.mav', handle: 'monetary.mav', initials: 'MM', signalScore: 9134, change: -11 },
   { id: 'devon_w',      handle: 'devon_w',      initials: 'DW', signalScore: 8902, change: +25 },
   { id: 'riley.x',      handle: 'riley.x',      initials: 'RX', signalScore: 8643, change: +67 },
@@ -129,7 +129,7 @@ const CIRCUIT_USERS: LeaderboardUser[] = [
 // ─── REEL · Entertainment ─────────────────────────────────────────────────────
 // taylor.alpha is rank 23 (index 22 in users array)
 const REEL_USERS: LeaderboardUser[] = [
-  { id: 'nina.j',       handle: 'nina.j',       initials: 'NJ', signalScore: 9489, change: +43 },
+  { id: 'nina_j',       handle: 'nina_j',       initials: 'NJ', signalScore: 9489, change: +43 },
   { id: 'devon_w',      handle: 'devon_w',      initials: 'DW', signalScore: 9267, change: +72 },
   { id: 'serena_k',     handle: 'serena_k',     initials: 'SK', signalScore: 8934, change: +19 },
   { id: 'mia.s',        handle: 'mia.s',        initials: 'MS', signalScore: 8712, change:  -8 },
@@ -197,7 +197,7 @@ const ATLAS_USERS: LeaderboardUser[] = [
   { id: 'jade.w',       handle: 'jade.w',       initials: 'JW', signalScore: 7001, change: +22 },
   { id: 'riley.x',      handle: 'riley.x',      initials: 'RX', signalScore: 6734, change: -11 },
   { id: 'will.b',       handle: 'will.b',       initials: 'WB', signalScore: 6467, change: +14 },
-  { id: 'nina.j',       handle: 'nina.j',       initials: 'NJ', signalScore: 6201, change: +56 },
+  { id: 'nina_j',       handle: 'nina_j',       initials: 'NJ', signalScore: 6201, change: +56 },
   { id: 'caden.m',      handle: 'caden.m',      initials: 'CM', signalScore: 5934, change:  -8 },
   { id: 'luna.v',       handle: 'luna.v',       initials: 'LV', signalScore: 5667, change: +31 },
   { id: 'ava.g',        handle: 'ava.g',        initials: 'AG', signalScore: 5401, change:  -3 },

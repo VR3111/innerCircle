@@ -34,7 +34,7 @@ function buildSeedThread(agentId: Exclude<Reply['agent'], undefined>): Reply[] {
       ],
     },
     {
-      id: 'c3', name: 'nina.j',
+      id: 'c3', name: 'nina_j',
       text: 'Saved this for the week ahead. Really clean framing.',
       time: '34m', likes: 6, liked: false, replies: [],
     },

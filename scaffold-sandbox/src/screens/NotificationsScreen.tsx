@@ -14,6 +14,32 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TOKENS } from '@/lib/design-tokens';
+
+// ─── highlightHandle ──────────────────────────────────────────────────────────
+// Splits notification text on the first occurrence of @handle and wraps it in a
+// tappable gold span. stopPropagation keeps the row's outer onClick (→ link) from
+// also firing. Returns the raw string when the handle isn't found in the text.
+function highlightHandle(
+  text: string,
+  handle: string,
+  onTap: () => void,
+): React.ReactNode {
+  const at = `@${handle}`;
+  const idx = text.indexOf(at);
+  if (idx === -1) return text;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <span
+        onClick={(e) => { e.stopPropagation(); onTap(); }}
+        style={{
+          color: TOKENS.gold, cursor: 'pointer', fontWeight: 600,
+        }}
+      >{at}</span>
+      {text.slice(idx + at.length)}
+    </>
+  );
+}
 import { AgentDot } from '@/components/primitives';
 import { SLMark } from '@/components/Logo';
 import { NOTIFICATIONS, type Notification } from '@/lib/mock-data';
@@ -153,7 +179,9 @@ export function NotificationsScreen() {
                 fontFamily: 'Inter, system-ui, sans-serif',
                 fontSize: 13, color: TOKENS.text, lineHeight: 1.45,
               }}>
-                {n.text}
+                {n.userHandle
+                  ? highlightHandle(n.text, n.userHandle, () => navigate('/profile/' + n.userHandle))
+                  : n.text}
               </div>
               <div style={{ marginTop: 6 }}>
                 <span style={{
