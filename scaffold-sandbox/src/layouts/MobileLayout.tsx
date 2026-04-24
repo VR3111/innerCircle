@@ -21,6 +21,16 @@ const ICONS = {
       <path d="M16 16l5 5" stroke={c} strokeWidth="1.6" strokeLinecap="round"/>
     </svg>
   ),
+  messages: (c: string) => (
+    // Paper plane — same 22×22 / viewBox 0 0 24 24 / strokeWidth 1.6 as all other nav icons.
+    // Stroke is on individual paths (matching home/explore/profile/leaderboard pattern).
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <path d="M22 2L11 13"
+            stroke={c} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M22 2L15 22L11 13L2 9L22 2Z"
+            stroke={c} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
   profile: (c: string) => (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
       <circle cx="12" cy="8" r="4" stroke={c} strokeWidth="1.6"/>
@@ -33,11 +43,13 @@ const TABS = [
   { id: 'home',        path: '/home',         label: 'Home' },
   { id: 'leaderboard', path: '/leaderboard',  label: 'Ranks' },
   { id: 'explore',     path: '/explore',      label: 'Explore' },
+  { id: 'messages',    path: '/dms',          label: 'Messages' },
   { id: 'profile',     path: '/profile',      label: 'Profile' },
 ] as const;
 
 /* Solid background — no backdrop-filter (breaks sticky on iOS WebKit) */
 export function BottomNav({ accent = '#E9C46A' }: { accent?: string }) {
+  const location = useLocation();
   return (
     <nav
       className="relative flex items-center justify-around border-t border-line bg-[rgba(10,10,10,0.96)]"
@@ -49,13 +61,17 @@ export function BottomNav({ accent = '#E9C46A' }: { accent?: string }) {
           className="relative p-2 bg-transparent border-0 cursor-pointer"
         >
           {({ isActive }) => {
-            const c = isActive ? accent : 'rgba(255,255,255,0.38)';
+            // Messages tab is also active on /dm/* thread routes
+            const active = t.id === 'messages'
+              ? (isActive || location.pathname.startsWith('/dm/'))
+              : isActive;
+            const c = active ? accent : 'rgba(255,255,255,0.38)';
             return (
               <>
                 {ICONS[t.id](c)}
                 <span
                   className="absolute bottom-0.5 left-1/2 w-[3px] h-[3px] rounded-full -translate-x-1/2 transition-opacity duration-200"
-                  style={{ background: accent, opacity: isActive ? 1 : 0, boxShadow: isActive ? `0 0 8px ${accent}` : 'none' }}
+                  style={{ background: accent, opacity: active ? 1 : 0, boxShadow: active ? `0 0 8px ${accent}` : 'none' }}
                 />
               </>
             );

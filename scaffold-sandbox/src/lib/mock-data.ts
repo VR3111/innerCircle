@@ -110,6 +110,110 @@ export const NOTIFICATIONS: Notification[] = [
   },
 ];
 
+// ─── DM types ─────────────────────────────────────────────────────────────────
+
+export type TierBadge = 'agent' | 'inner_circle';
+
+export type DMThread = {
+  id: string;
+  kind: 'agent' | 'user';
+  agent?: AgentId;
+  userHandle?: string;
+  userInitials?: string;
+  tierBadge?: TierBadge;
+  online: boolean;
+  muted: boolean;
+  locked: boolean;
+  last: string;
+  time: string;
+  unread: number;
+};
+
+export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read';
+
+export type DMMessage = {
+  id: string;
+  from: 'me' | 'agent' | 'user';
+  text?: string;
+  time: string;
+  status?: MessageStatus;
+  // Reserved for Part 2 — include now to avoid type churn later
+  replyTo?: string;
+  reactions?: Array<{ emoji: string; from: 'me' | 'them' }>;
+  attachment?: { type: 'photo' | 'file'; name?: string; url: string; size?: string };
+};
+
+// ─── DM mock data ─────────────────────────────────────────────────────────────
+
+export const DM_THREADS: DMThread[] = [
+  { id: 't1', kind: 'agent', agent: 'BARON',   online: true,  muted: false, locked: false,
+    last: 'Nina — size into it at 60% of intended.',             time: '1m',  unread: 2 },
+  { id: 't2', kind: 'agent', agent: 'CIRCUIT',  online: true,  muted: false, locked: false,
+    last: 'The pricing page quietly shipped agents v2.',          time: '18m', unread: 1 },
+  { id: 't3', kind: 'agent', agent: 'PULSE',    online: false, muted: false, locked: false,
+    last: "Swap tomorrow's tempo for a zone-2 block.",            time: '2h',  unread: 0 },
+  { id: 't4', kind: 'agent', agent: 'REEL',     online: false, muted: false, locked: false,
+    last: 'Premiere list drops Friday.',                          time: '1d',  unread: 0 },
+  { id: 't5', kind: 'agent', agent: 'BLITZ',    online: false, muted: false, locked: false,
+    last: 'Title race is tightening.',                            time: '2d',  unread: 0 },
+  { id: 't6', kind: 'agent', agent: 'ATLAS',    tierBadge: 'agent', online: false, muted: false, locked: false,
+    last: 'Turnout data is tighter than the polls suggest.',      time: '3h',  unread: 0 },
+  { id: 'u1', kind: 'user',  userHandle: 'devon_w',  userInitials: 'DW',
+    tierBadge: 'inner_circle', online: true,  muted: false, locked: true,
+    last: 'saw your take on 10Y. want to trade notes?',           time: '4m',  unread: 3 },
+  { id: 'u2', kind: 'user',  userHandle: 'nina.j',   userInitials: 'NJ',
+    tierBadge: 'inner_circle', online: false, muted: true,  locked: true,
+    last: 'your framing on tech was strong.',                     time: '6h',  unread: 0 },
+];
+
+export const DM_MESSAGES: Record<string, DMMessage[]> = {
+  // BARON — ported from prototype DM_MESSAGES.BARON (6 messages)
+  t1: [
+    { id: 'm1', from: 'agent', text: 'Morning. You asked about the 10Y break below 4.05.',                                    time: '9:41' },
+    { id: 'm2', from: 'me',    text: 'Yeah — does that change your risk-on stance into earnings?',                             time: '9:43', status: 'read' },
+    { id: 'm3', from: 'agent', text: "Shifts the calculus, doesn't flip it. Tech is still expensive on 12M fwd. Add slowly.", time: '9:44' },
+    { id: 'm4', from: 'agent', text: "My guidance: 60% of intended on open, add on strength above yesterday's high.",         time: '9:44' },
+    { id: 'm5', from: 'me',    text: 'Understood. Any hedge you\'d pair with it?',                                            time: '9:45', status: 'read' },
+    { id: 'm6', from: 'agent', text: "Modest vol hedge through month-end. The chop isn't done.",                              time: '9:46' },
+  ],
+  // CIRCUIT — 3 messages
+  t2: [
+    { id: 'c1', from: 'agent', text: 'The pricing page quietly shipped agents v2.',                     time: '9:41' },
+    { id: 'c2', from: 'me',    text: "Yeah — I noticed. Any read on what changed?",                    time: '9:42', status: 'read' },
+    { id: 'c3', from: 'agent', text: 'The inference tier is the tell. Check the GitHub activity first.', time: '9:44' },
+  ],
+  // PULSE — 3 messages
+  t3: [
+    { id: 'p1', from: 'agent', text: "Swap tomorrow's tempo for a zone-2 block.",               time: '7:30' },
+    { id: 'p2', from: 'me',    text: "I'm already at 5 days this week.",                        time: '7:31', status: 'read' },
+    { id: 'p3', from: 'agent', text: 'Recover first, measure second. Sleep debt is real.',      time: '7:32' },
+  ],
+  // REEL — 1 message (locked)
+  t4: [
+    { id: 'r1', from: 'agent', text: 'Premiere list drops Friday.', time: '1d' },
+  ],
+  // BLITZ — 1 message
+  t5: [
+    { id: 'b1', from: 'agent', text: 'Title race is tightening.',   time: '2d' },
+  ],
+  // ATLAS — 3 messages
+  t6: [
+    { id: 'a1', from: 'agent', text: 'Turnout data is tighter than the polls suggest.', time: '10:20' },
+    { id: 'a2', from: 'me',    text: 'Which state should I watch?',                     time: '10:22', status: 'read' as const },
+    { id: 'a3', from: 'agent', text: 'Pennsylvania. The ground game there is underrated.', time: '10:24' },
+  ],
+  // devon_w — 3 messages (locked user thread)
+  u1: [
+    { id: 'u1a', from: 'user', text: 'saw your take on 10Y. want to trade notes?',        time: '4m' },
+    { id: 'u1b', from: 'me',   text: "Sure — what's your read?",                          time: '4m', status: 'read' },
+    { id: 'u1c', from: 'user', text: "Think the move is overextended. Vol's compressing.", time: '3m' },
+  ],
+  // nina.j — 1 message (locked + muted user thread)
+  u2: [
+    { id: 'u2a', from: 'user', text: 'your framing on tech was strong.', time: '6h' },
+  ],
+};
+
 export function fmtCompact(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1) + 'M';
   if (n >= 1_000) return (n / 1_000).toFixed(n >= 10_000 ? 0 : 1) + 'K';

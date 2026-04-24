@@ -14,6 +14,8 @@ import { AuthScreen } from './screens/AuthScreen';
 import { PlaceholderScreen } from './screens/PlaceholderScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
 import { ComposeScreen } from './screens/ComposeScreen';
+import { DMListScreen } from './screens/DMListScreen';
+import { DMThreadScreen } from './screens/DMThreadScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { PaywallScreen } from './screens/PaywallScreen';
 
@@ -39,8 +41,8 @@ export function App() {
         <Route path="/notifications" element={<NotificationsScreen />} />
         <Route path="/settings" element={<SettingsScreen />} />
         <Route path="/compose" element={<ComposeScreen />} />
-        <Route path="/dms" element={<PlaceholderScreen title="Messages" note="Inner Circle only." />} />
-        <Route path="/dm/:agent" element={<PlaceholderScreen title="DM Thread" />} />
+        <Route path="/dms" element={<DMListScreen />} />
+        <Route path="/dm/:threadId" element={<DMThreadScreen />} />
         <Route path="/paywall" element={<PaywallScreen />} />
         <Route path="/auth" element={<AuthScreen />} />
         <Route path="/reset-password" element={<PlaceholderScreen title="Reset Password" />} />
