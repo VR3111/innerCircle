@@ -13,6 +13,7 @@ import { NotificationsScreen } from './screens/NotificationsScreen';
 import { AuthScreen } from './screens/AuthScreen';
 import { PlaceholderScreen } from './screens/PlaceholderScreen';
 import { ProfileScreen } from './screens/ProfileScreen';
+import { UserProfileScreen } from './screens/UserProfileScreen';
 import { ComposeScreen } from './screens/ComposeScreen';
 import { DMListScreen } from './screens/DMListScreen';
 import { DMThreadScreen } from './screens/DMThreadScreen';
@@ -36,7 +37,7 @@ export function App() {
         <Route path="/leaderboard/:category" element={<CategoryLeaderboardScreen />} />
         <Route path="/explore" element={<ExploreScreen />} />
         <Route path="/profile" element={<ProfileScreen />} />
-        {/* /profile/:handle — UserProfileScreen (Part 2) */}
+        <Route path="/profile/:handle" element={<UserProfileScreen />} />
         <Route path="/post/:id" element={<PostDetailScreen />} />
         <Route path="/notifications" element={<NotificationsScreen />} />
         <Route path="/settings" element={<SettingsScreen />} />

@@ -1,26 +1,27 @@
-// ProfileScreen — own profile at /profile
+// UserProfileScreen — view another user's profile at /profile/:handle
 //
-// Part 1 scope:
-//   ✅ Avatar + identity block (initials, name, handle, IC/CC labels, bio)
-//   ✅ Signal score featured card + info popover
-//   ✅ Secondary stats row (Following / Followers / Posts)
-//   ✅ Arenas badges (rank ≤ 100, max 3, CREATORS pill for rank ≤ 5)
-//   ✅ Action buttons (Edit Profile / Share Profile — no-op)
-//   ✅ Upgrade to Inner Circle gold button (free users only)
-//   ✅ Post grid (3-column, non-interactive SVG thumbnails)
+// Part 2a scope:
+//   ✅ Identity block (avatar ring, name, handle, IC/CC labels, bio)
+//   ✅ Signal score card
+//   ✅ Secondary stats (following / followers+1-if-followed / posts)
+//   ✅ Arenas badges (same filter/pill logic as ProfileScreen)
+//   ✅ Follow button — localStorage persistence, immediate toggle
+//   ✅ Message button — premium → DM thread; free → paywall
+//   ✅ Post grid — 3-column, non-interactive
+//   ✅ Header three-dot menu with Block + Report (non-functional, TODO)
+//   ✅ 404 for unknown handles
+//   ✅ Redirect /profile/vinay → /profile
 //
-// Part 2 TODO:
-//   - UserProfileScreen.tsx for /profile/:handle (other users)
-//   - Follow/unfollow state
-//   - Post grid tiles clickable
+// Part 2b TODO:
+//   - Entry points: DM list rows, Notifications, Post author, Arenas, Explore
 
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import { TOKENS, AGENTS } from '@/lib/design-tokens';
 import { AgentDot } from '@/components/primitives';
 import { SLMark } from '@/components/Logo';
-import { CURRENT_USER, getPostsForUser } from '@/lib/mock-data';
-import { getFollowCount } from '@/lib/follow-preferences';
+import { MOCK_USERS, CURRENT_USER, DM_THREADS, getPostsForUser } from '@/lib/mock-data';
+import { isFollowing, setFollowing as persistFollowing } from '@/lib/follow-preferences';
 
 const FONT = 'Inter, system-ui, sans-serif';
 const MONO = 'ui-monospace, monospace';
@@ -39,44 +40,152 @@ const iconBtnStyle: React.CSSProperties = {
   flexShrink: 0,
 };
 
-export function ProfileScreen() {
+export function UserProfileScreen() {
   const navigate = useNavigate();
+  const { handle = '' } = useParams<{ handle: string }>();
 
-  // Read premium from localStorage once at mount — do not re-read mid-session
-  const [isPremium] = useState(() => localStorage.getItem('sl-premium') === '1');
-  // Dynamic following count: baseline + accounts followed via UserProfileScreen.
-  // Read once at mount; updates on next mount after following someone on another screen.
-  const [dynamicFollowing] = useState(() => CURRENT_USER.following + getFollowCount());
-  const [showSignalInfo, setShowSignalInfo] = useState(false);
+  // ── All hooks unconditionally first ───────────────────────────────────────
 
+  const [isPremium]      = useState(() => localStorage.getItem('sl-premium') === '1');
+  const [following, setFollowState] = useState(() => isFollowing(handle));
+  const [followHovered, setFollowHovered] = useState(false);
+  const [showMenu, setShowMenu]   = useState(false);
+
+  const menuRef       = useRef<HTMLDivElement>(null);
   const signalCardRef = useRef<HTMLDivElement>(null);
   const popoverRef    = useRef<HTMLDivElement>(null);
+  const [showSignalInfo, setShowSignalInfo] = useState(false);
 
-  const user  = { ...CURRENT_USER, isPremium };
-  const posts = useMemo(() => getPostsForUser(user), [user.handle, user.postCount]);
+  const user  = MOCK_USERS[handle];
+  const posts = useMemo(() => (user ? getPostsForUser(user) : []), [user?.handle]);
+
+  // Close three-dot menu on outside click
+  useEffect(() => {
+    if (!showMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showMenu]);
 
   // Close signal info popover on outside click
   useEffect(() => {
     if (!showSignalInfo) return;
     const handler = (e: MouseEvent) => {
       const target = e.target as Node;
-      const insidePopover = popoverRef.current?.contains(target) ?? false;
-      const insideCard    = signalCardRef.current?.contains(target) ?? false;
-      if (!insidePopover && !insideCard) setShowSignalInfo(false);
+      if (
+        !(popoverRef.current?.contains(target)) &&
+        !(signalCardRef.current?.contains(target))
+      ) setShowSignalInfo(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [showSignalInfo]);
 
-  // Avatar ring: CC gets gold glow, premium gets plain gold border, otherwise subtle
+  // ── Guards — after all hooks ───────────────────────────────────────────────
+
+  // Own handle → own profile
+  if (handle === CURRENT_USER.handle) return <Navigate to="/profile" replace />;
+
+  // Unknown handle → 404
+  if (!user) {
+    return (
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: TOKENS.bg,
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        padding: '40px 20px',
+        fontFamily: FONT,
+      }}>
+        <div style={{
+          fontFamily: MONO, fontSize: 12, letterSpacing: 1.4, color: TOKENS.mute,
+        }}>
+          USER NOT FOUND
+        </div>
+        <div style={{ fontSize: 14, color: TOKENS.mute2, marginTop: 8, textAlign: 'center' }}>
+          @{handle}
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          style={{
+            marginTop: 16, background: 'none', border: 'none',
+            color: TOKENS.mute2, cursor: 'pointer',
+            fontFamily: FONT, fontSize: 14, textDecoration: 'underline',
+            padding: 0,
+          }}
+        >
+          Go back
+        </button>
+      </div>
+    );
+  }
+
+  // ── Derived values ────────────────────────────────────────────────────────
+
+  const displayedFollowers = user.followers + (following ? 1 : 0);
+  const visibleBadges = user.arenaBadges.filter(b => b.rank <= 100).slice(0, 3);
+
   const avatarRingStyle: React.CSSProperties = user.creatorsClub
     ? { boxShadow: `0 0 0 2.5px ${TOKENS.gold}, 0 0 20px rgba(212,175,55,0.3)` }
     : user.isPremium
       ? { boxShadow: `0 0 0 2px ${TOKENS.gold}` }
       : { boxShadow: '0 0 0 1.5px rgba(255,255,255,0.10)' };
 
-  // Arenas: filter rank ≤ 100, show max 3
-  const visibleBadges = user.arenaBadges.filter(b => b.rank <= 100).slice(0, 3);
+  // ── Handlers ──────────────────────────────────────────────────────────────
+
+  const toggleFollow = () => {
+    const next = !following;
+    setFollowState(next);
+    persistFollowing(handle, next);
+  };
+
+  const handleMessage = () => {
+    if (!isPremium) {
+      navigate('/paywall');
+      return;
+    }
+    // Find existing DM thread for this user handle (linear scan — small list)
+    const thread = DM_THREADS.find(t => t.kind === 'user' && t.userHandle === handle);
+    if (thread) {
+      navigate('/dm/' + thread.id);
+    } else {
+      // TODO: Create new DM thread — requires backend (no thread seeded for this handle)
+      console.warn(`No DM thread found for @${handle} — navigating to DM list`);
+      navigate('/dms');
+    }
+  };
+
+  // ── Follow button style ───────────────────────────────────────────────────
+  // Following: gold filled.  Not-following: gold outline.
+  // Hover applies a subtle opacity shift via followHovered state.
+
+  const followBtnStyle: React.CSSProperties = following
+    ? {
+        flex: 1, height: 42, borderRadius: 12,
+        background: followHovered
+          ? 'linear-gradient(135deg, #F9DC8F 0%, #C9A227 100%)'
+          : 'linear-gradient(135deg, #F4D47C 0%, #D4AF37 100%)',
+        border: 'none',
+        color: '#0A0A0A',
+        fontFamily: FONT, fontSize: 14, fontWeight: 600,
+        cursor: 'pointer',
+        boxShadow: '0 0 12px rgba(212,175,55,0.25)',
+        transition: 'background 150ms ease',
+      }
+    : {
+        flex: 1, height: 42, borderRadius: 12,
+        background: followHovered ? 'rgba(212,175,55,0.08)' : 'transparent',
+        border: `1.5px solid ${TOKENS.gold}`,
+        color: TOKENS.gold,
+        fontFamily: FONT, fontSize: 14, fontWeight: 600,
+        cursor: 'pointer',
+        transition: 'background 150ms ease',
+      };
 
   return (
     <div style={{
@@ -86,7 +195,7 @@ export function ProfileScreen() {
       fontFamily: FONT,
     }}>
 
-      {/* ── Header ────────────────────────────────────────────────────────── */}
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10,
         padding: 'calc(18px + var(--ic-top-inset,0px)) 20px 8px',
@@ -103,29 +212,62 @@ export function ProfileScreen() {
         <span style={{
           flex: 1, textAlign: 'center',
           fontFamily: FONT, fontSize: 17, fontWeight: 600, color: TOKENS.text,
-        }}>Profile</span>
+        }}>
+          Profile
+        </span>
 
-        <button type="button" onClick={() => navigate('/settings')} style={iconBtnStyle}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.6"/>
-            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"
-              stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-        </button>
+        {/* Three-dot menu — Block + Report (non-functional) */}
+        <div style={{ position: 'relative' }} ref={menuRef}>
+          <button type="button" onClick={() => setShowMenu(v => !v)} style={iconBtnStyle}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <circle cx="5"  cy="12" r="1.5" fill="currentColor"/>
+              <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+              <circle cx="19" cy="12" r="1.5" fill="currentColor"/>
+            </svg>
+          </button>
+
+          {showMenu && (
+            <div style={{
+              position: 'absolute', top: 42, right: 0,
+              background: TOKENS.bg1,
+              border: `1px solid ${TOKENS.line}`,
+              borderRadius: 10, padding: 6, minWidth: 160, zIndex: 10,
+              boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+            }}>
+              {/* TODO: Block — requires backend; non-functional */}
+              <MenuRow
+                label="Block"
+                danger
+                onClick={() => {
+                  // TODO: block @{handle}
+                  setShowMenu(false);
+                }}
+              />
+              {/* TODO: Report — requires backend; non-functional */}
+              <MenuRow
+                label="Report"
+                onClick={() => {
+                  // TODO: report @{handle}
+                  setShowMenu(false);
+                }}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* ── Scrollable body ──────────────────────────────────────────────── */}
+      {/* ── Scrollable body ─────────────────────────────────────────────────── */}
       <div
         className="no-scrollbar"
         style={{ flex: 1, overflowY: 'auto', paddingBottom: 100 }}
       >
 
-        {/* ── Avatar + identity ────────────────────────────────────────────── */}
+        {/* ── Identity block ─────────────────────────────────────────────────── */}
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center',
           padding: '28px 20px 16px',
         }}>
-          {/* Avatar circle — ring style set by tier */}
+          {/* Avatar */}
           <div style={{
             width: 96, height: 96, borderRadius: '50%',
             background: 'linear-gradient(135deg, #2a2a2a, #121212)',
@@ -157,11 +299,9 @@ export function ProfileScreen() {
             @{user.handle}
           </div>
 
-          {/* Inner Circle label — only if premium */}
+          {/* Inner Circle label */}
           {user.isPremium && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 5, marginTop: 4,
-            }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
               <SLMark size={14} color={TOKENS.gold} />
               <span style={{
                 fontFamily: MONO, fontSize: 9, letterSpacing: 1.4, color: TOKENS.gold,
@@ -169,7 +309,7 @@ export function ProfileScreen() {
             </div>
           )}
 
-          {/* Creators Club label — only if CC member */}
+          {/* Creators Club label */}
           {user.creatorsClub && (
             <div style={{
               marginTop: 3,
@@ -191,7 +331,7 @@ export function ProfileScreen() {
           </div>
         </div>
 
-        {/* ── Signal score block ───────────────────────────────────────────── */}
+        {/* ── Signal score ──────────────────────────────────────────────────── */}
         <div style={{ marginTop: 18, padding: '0 20px', position: 'relative' }}>
           <div
             ref={signalCardRef}
@@ -206,9 +346,7 @@ export function ProfileScreen() {
             <div>
               <div style={{
                 fontFamily: MONO, fontSize: 10, letterSpacing: 1.4, color: TOKENS.mute2,
-              }}>
-                SIGNAL SCORE
-              </div>
+              }}>SIGNAL SCORE</div>
               <div style={{
                 fontFamily: FONT, fontSize: 28, fontWeight: 700, color: TOKENS.gold,
                 marginTop: 2,
@@ -216,8 +354,6 @@ export function ProfileScreen() {
                 {user.signalScore.toLocaleString()}
               </div>
             </div>
-
-            {/* Info icon — toggles explainer popover */}
             <button
               type="button"
               onClick={() => setShowSignalInfo(v => !v)}
@@ -230,12 +366,9 @@ export function ProfileScreen() {
                 fontFamily: MONO, fontSize: 12, fontWeight: 700,
                 flexShrink: 0,
               }}
-            >
-              ?
-            </button>
+            >?</button>
           </div>
 
-          {/* Signal score explainer popover — closes on outside click */}
           {showSignalInfo && (
             <div
               ref={popoverRef}
@@ -253,13 +386,13 @@ export function ProfileScreen() {
               <div style={{
                 fontFamily: FONT, fontSize: 13, color: TOKENS.mute, lineHeight: 1.5,
               }}>
-                Your signalScore reflects activity across agent categories: posts, engagement, streaks, and retention. Updated daily.
+                signalScore reflects activity across agent categories: posts, engagement, streaks, and retention. Updated daily.
               </div>
             </div>
           )}
         </div>
 
-        {/* ── Secondary stats row ──────────────────────────────────────────── */}
+        {/* ── Stats row ────────────────────────────────────────────────────── */}
         <div style={{ marginTop: 8, padding: '0 20px' }}>
           <div style={{
             display: 'grid', gridTemplateColumns: '1fr 1fr 1fr',
@@ -269,8 +402,8 @@ export function ProfileScreen() {
             padding: '14px 0',
           }}>
             {[
-              { label: 'FOLLOWING', value: dynamicFollowing },
-              { label: 'FOLLOWERS', value: user.followers },
+              { label: 'FOLLOWING', value: user.following },
+              { label: 'FOLLOWERS', value: displayedFollowers },
               { label: 'POSTS',     value: user.postCount },
             ].map(({ label, value }, i) => (
               <div
@@ -302,9 +435,7 @@ export function ProfileScreen() {
             <div style={{
               fontFamily: MONO, fontSize: 10, letterSpacing: 1.4, color: TOKENS.mute2,
               marginBottom: 8,
-            }}>
-              ARENAS
-            </div>
+            }}>ARENAS</div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {visibleBadges.map(badge => {
@@ -320,7 +451,6 @@ export function ProfileScreen() {
                     }}
                   >
                     <AgentDot agent={badge.agent} size={32} clickable={false} />
-
                     <div style={{ flex: 1 }}>
                       <div style={{
                         fontFamily: FONT, fontSize: 14, fontWeight: 600, color: TOKENS.text,
@@ -333,8 +463,6 @@ export function ProfileScreen() {
                         Rank #{badge.rank} of {badge.total.toLocaleString()}
                       </div>
                     </div>
-
-                    {/* CREATORS pill — shown for rank ≤ 5 */}
                     {badge.rank <= 5 && (
                       <span style={{
                         padding: '3px 8px', borderRadius: 4,
@@ -352,57 +480,46 @@ export function ProfileScreen() {
           </div>
         )}
 
-        {/* ── Action buttons ───────────────────────────────────────────────── */}
+        {/* ── Action buttons: Follow + Message ─────────────────────────────── */}
         <div style={{ marginTop: 20, padding: '0 20px' }}>
           <div style={{ display: 'flex', gap: 10 }}>
+
+            {/* Follow / Following toggle */}
             <button
               type="button"
-              onClick={() => { /* TODO: Edit flow in future prompt */ }}
-              style={{
-                flex: 1, height: 42, borderRadius: 12,
-                background: 'rgba(255,255,255,0.04)',
-                border: `1px solid ${TOKENS.line}`,
-                color: TOKENS.text,
-                fontFamily: FONT, fontSize: 14, fontWeight: 500,
-                cursor: 'pointer',
-              }}
+              onClick={toggleFollow}
+              onMouseEnter={() => setFollowHovered(true)}
+              onMouseLeave={() => setFollowHovered(false)}
+              style={followBtnStyle}
             >
-              Edit Profile
+              {following ? 'Following' : 'Follow'}
             </button>
+
+            {/* Message — premium → DM; free → paywall */}
             <button
               type="button"
-              onClick={() => { /* TODO: Share profile */ }}
+              onClick={handleMessage}
               style={{
                 flex: 1, height: 42, borderRadius: 12,
-                background: 'rgba(255,255,255,0.04)',
-                border: `1px solid ${TOKENS.line}`,
-                color: TOKENS.text,
+                background: isPremium ? 'rgba(255,255,255,0.04)' : 'rgba(212,175,55,0.08)',
+                border: `1px solid ${isPremium ? TOKENS.line : 'rgba(212,175,55,0.3)'}`,
+                color: isPremium ? TOKENS.text : TOKENS.gold,
                 fontFamily: FONT, fontSize: 14, fontWeight: 500,
                 cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               }}
             >
-              Share Profile
+              {!isPremium && (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="11" width="18" height="11" rx="2"
+                    stroke="currentColor" strokeWidth="2"/>
+                  <path d="M7 11V7a5 5 0 0110 0v4"
+                    stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              )}
+              Message
             </button>
           </div>
-
-          {/* Upgrade button — free users only */}
-          {!user.isPremium && (
-            <button
-              type="button"
-              onClick={() => navigate('/paywall')}
-              style={{
-                width: '100%', height: 42, borderRadius: 12, marginTop: 10,
-                background: 'linear-gradient(135deg, #F4D47C 0%, #D4AF37 100%)',
-                border: 'none',
-                color: '#0A0A0A',
-                fontFamily: FONT, fontSize: 14, fontWeight: 600,
-                cursor: 'pointer',
-                boxShadow: '0 4px 16px rgba(212,175,55,0.35)',
-              }}
-            >
-              Upgrade to Inner Circle
-            </button>
-          )}
         </div>
 
         {/* ── Post grid ────────────────────────────────────────────────────── */}
@@ -428,7 +545,7 @@ export function ProfileScreen() {
               gap: 2,
             }}>
               {posts.map(post => (
-                // Part 2: onClick navigates to /post/{postId}
+                // Part 2c: onClick navigates to /post/{postId}
                 <div
                   key={post.id}
                   style={{
@@ -445,5 +562,33 @@ export function ProfileScreen() {
 
       </div>
     </div>
+  );
+}
+
+// ── MenuRow ── small helper for the three-dot dropdown ────────────────────────
+
+function MenuRow({ label, onClick, danger }: {
+  label: string; onClick: () => void; danger?: boolean;
+}) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex', alignItems: 'center',
+        width: '100%', height: 36, padding: '8px 12px',
+        background: hovered ? 'rgba(255,255,255,0.04)' : 'transparent',
+        border: 'none', borderRadius: 6,
+        cursor: 'pointer', textAlign: 'left',
+        fontFamily: 'Inter, system-ui, sans-serif', fontSize: 13,
+        color: danger ? TOKENS.down : TOKENS.text,
+        transition: 'background 100ms',
+      }}
+    >
+      {label}
+    </button>
   );
 }

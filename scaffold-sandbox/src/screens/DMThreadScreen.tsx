@@ -1136,7 +1136,24 @@ export function DMThreadScreen() {
         </div>
 
         <div style={{ flex: 1, lineHeight: 1.1 }}>
-          <div style={{ fontFamily: FONT, fontSize: 14, fontWeight: 600 }}>{displayName}</div>
+          {/* Part 2b: other entry points (DM list, Notifications, Post author, Arenas, Explore) */}
+          {isUserThread ? (
+            // User threads: tap name → /profile/:handle
+            <button
+              type="button"
+              onClick={() => navigate('/profile/' + thread.userHandle)}
+              style={{
+                fontFamily: FONT, fontSize: 14, fontWeight: 600, color: TOKENS.text,
+                background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                display: 'block', textAlign: 'left',
+              }}
+            >
+              {displayName}
+            </button>
+          ) : (
+            // Agent threads: static — agents have no /profile/:handle page
+            <div style={{ fontFamily: FONT, fontSize: 14, fontWeight: 600 }}>{displayName}</div>
+          )}
           <div style={{
             fontFamily: MONO, fontSize: 9.5, color: subtitleColor,
             letterSpacing: 1.2, marginTop: 3,

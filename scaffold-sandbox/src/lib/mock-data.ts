@@ -483,8 +483,18 @@ export type ProfilePost = {
   agent: AgentId;
 };
 
-// Generates a simple SVG thumbnail — agent-color tinted, number watermark.
-// encodeURIComponent handles all characters safely (no btoa latin-1 constraint).
+export type MockPost = {
+  id: string;           // e.g. "devon_w-p001"
+  authorHandle: string;
+  agent: AgentId;
+  thumbnailUrl: string;
+  caption: string;
+  likes: number;
+  comments: number;
+  createdAt: string;    // e.g. "3d ago"
+};
+
+// SVG thumbnail — agent-color tinted, number watermark.
 function generatePostThumbnail(agent: AgentId, idx: number): string {
   const color = AGENTS[agent]?.color ?? '#D4AF37';
   const svg =
@@ -497,18 +507,51 @@ function generatePostThumbnail(agent: AgentId, idx: number): string {
   return 'data:image/svg+xml,' + encodeURIComponent(svg);
 }
 
-// Generates all posts for a user, cycling through their arena badge agents.
-export function getPostsForUser(user: UserProfile): ProfilePost[] {
-  const posts: ProfilePost[] = [];
-  const agents = user.arenaBadges.map(b => b.agent);
-  if (agents.length === 0) agents.push('BARON'); // fallback for badge-less users
-  for (let i = 0; i < user.postCount; i++) {
-    const agent = agents[i % agents.length];
-    posts.push({
-      id: `${user.handle}-post-${i}`,
-      thumbnailUrl: generatePostThumbnail(agent, i),
-      agent,
-    });
+// Deterministic pseudo-random from a string.
+// Same input → same output across reloads — no Math.random() non-determinism.
+function seed(str: string): number {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+// Central post registry — built once at module load for all users.
+// Keys are globally unique post IDs: "{handle}-p{001..NNN}".
+export const ALL_POSTS: Record<string, MockPost> = (() => {
+  const posts: Record<string, MockPost> = {};
+  const allUsers: UserProfile[] = [CURRENT_USER, ...Object.values(MOCK_USERS)];
+
+  for (const user of allUsers) {
+    const agents: AgentId[] = user.arenaBadges.map(b => b.agent);
+    if (agents.length === 0) agents.push('BARON'); // fallback for badge-less users
+
+    for (let i = 0; i < user.postCount; i++) {
+      const agent = agents[i % agents.length];
+      const id = `${user.handle}-p${String(i + 1).padStart(3, '0')}`;
+      posts[id] = {
+        id,
+        authorHandle: user.handle,
+        agent,
+        thumbnailUrl: generatePostThumbnail(agent, i),
+        caption: `Sample post ${i + 1} from @${user.handle} in ${AGENTS[agent].name}'s space.`,
+        likes:    (seed(id) % 490) + 10,
+        comments:  seed(id + 'c') % 50,
+        createdAt: `${(i % 30) + 1}d ago`,
+      };
+    }
   }
   return posts;
+})();
+
+// Returns ProfilePost[] for a user, sourced from ALL_POSTS (stable, deterministic IDs).
+export function getPostsForUser(user: UserProfile): ProfilePost[] {
+  return Object.values(ALL_POSTS)
+    .filter(p => p.authorHandle === user.handle)
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map(p => ({ id: p.id, thumbnailUrl: p.thumbnailUrl, agent: p.agent }));
+}
+
+// Lookup a post by ID — used by PostDetail (Part 2c).
+export function getPostById(id: string): MockPost | undefined {
+  return ALL_POSTS[id];
 }
