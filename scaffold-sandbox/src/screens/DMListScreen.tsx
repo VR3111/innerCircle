@@ -14,6 +14,7 @@ import { TOKENS, AGENTS } from '@/lib/design-tokens';
 import { AgentDot } from '@/components/primitives';
 import { SLMark } from '@/components/Logo';
 import { DM_THREADS, type DMThread } from '@/lib/mock-data';
+import { isThreadMuted } from '@/lib/dm-preferences';
 
 const FONT = 'Inter, system-ui, sans-serif';
 const MONO = 'ui-monospace, monospace';
@@ -44,6 +45,8 @@ interface ThreadRowProps {
 function ThreadRow({ thread, i, isPremium, onNavigate }: ThreadRowProps) {
   const [hovered, setHovered] = useState(false);
   const effectivelyLocked = thread.locked && !isPremium;
+  // Fix 5: override mock-data muted default with localStorage persisted preference
+  const isMuted = isThreadMuted(thread.id, thread.muted);
 
   const A = thread.agent ? AGENTS[thread.agent] : null;
   const displayName = A ? A.name : `@${thread.userHandle ?? ''}`;
@@ -147,8 +150,8 @@ function ThreadRow({ thread, i, isPremium, onNavigate }: ThreadRowProps) {
           {thread.tierBadge === 'inner_circle' && (
             <SLMark size={11} color={TOKENS.gold} />
           )}
-          {/* Muted bell-slash */}
-          {thread.muted && (
+          {/* Muted bell-slash — reads from localStorage via isThreadMuted */}
+          {isMuted && (
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" style={{ color: TOKENS.mute3 }}>
               <path d="M13.73 21a2 2 0 01-3.46 0M18.63 13A17.89 17.89 0 0118 8M6.26 6.26A5.86 5.86 0 006 8c0 7-3 9-3 9h14M18 8a6 6 0 00-9.33-5M1 1l22 22"
                 stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>

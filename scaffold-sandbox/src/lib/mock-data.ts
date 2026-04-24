@@ -171,10 +171,13 @@ export const DM_MESSAGES: Record<string, DMMessage[]> = {
   t1: [
     { id: 'm1', from: 'agent', text: 'Morning. You asked about the 10Y break below 4.05.',                                    time: '9:41' },
     { id: 'm2', from: 'me',    text: 'Yeah — does that change your risk-on stance into earnings?',                             time: '9:43', status: 'read' },
-    { id: 'm3', from: 'agent', text: "Shifts the calculus, doesn't flip it. Tech is still expensive on 12M fwd. Add slowly.", time: '9:44' },
+    { id: 'm3', from: 'agent', text: "Shifts the calculus, doesn't flip it. Tech is still expensive on 12M fwd. Add slowly.", time: '9:44',
+      reactions: [{ emoji: '🔥', from: 'me' }, { emoji: '🔥', from: 'them' }, { emoji: '👏', from: 'them' }] },
     { id: 'm4', from: 'agent', text: "My guidance: 60% of intended on open, add on strength above yesterday's high.",         time: '9:44' },
-    { id: 'm5', from: 'me',    text: 'Understood. Any hedge you\'d pair with it?',                                            time: '9:45', status: 'read' },
-    { id: 'm6', from: 'agent', text: "Modest vol hedge through month-end. The chop isn't done.",                              time: '9:46' },
+    { id: 'm5', from: 'me',    text: 'Understood. Any hedge you\'d pair with it?',                                            time: '9:45', status: 'read',
+      reactions: [{ emoji: '❤️', from: 'them' }] },
+    { id: 'm6', from: 'agent', text: "Modest vol hedge through month-end. The chop isn't done.",                              time: '9:46',
+      replyTo: 'm5' },
   ],
   // CIRCUIT — 3 messages
   t2: [

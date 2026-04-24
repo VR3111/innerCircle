@@ -1,26 +1,30 @@
 // DMThreadScreen — individual DM conversation
 // Route: /dm/:threadId
 //
-// Part 2 TODO list:
-//   - Attachment menu (paperclip button is rendered but non-functional)
-//   - Long-press message to open reaction / reply / copy sheet
-//   - Swipe-left on a message to trigger reply-to
-//   - Render replyTo preview above bubble when present
-//   - Render reaction row below bubble when present
+// Part 2b — interactions layer:
+//   ✅ Long-press action menu (emoji row + Reply + Copy + Delete)
+//   ✅ Swipe-to-reply gesture (mobile touch only — desktop uses long-press + menu)
+//   ✅ Inline reply threading (reply chip + quoted preview)
+//   ✅ Reactions rendering (emoji pills)
+//   ✅ Per-thread mute persistence to localStorage
+//
+// Part 2c TODO list:
+//   - Attachment menu (paperclip button stays no-op)
 //   - Free-tier message counter check before send
-//   - Global lock UI when monthly quota hit
-//   - Persist mute preference to backend
-//   - "View profile" menu item should navigate to /profile/:handle
-//   - "Block" menu item should call backend block endpoint
+//   - Global quota-exhausted lock UI
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useParams, Navigate } from 'react-router-dom';
 import { TOKENS, AGENTS } from '@/lib/design-tokens';
 import { AgentDot } from '@/components/primitives';
 import { DM_THREADS, DM_MESSAGES, type DMMessage, type MessageStatus } from '@/lib/mock-data';
+import { isThreadMuted, setThreadMuted } from '@/lib/dm-preferences';
 
 const FONT = 'Inter, system-ui, sans-serif';
 const MONO = 'ui-monospace, monospace';
+
+// Six emoji for the reaction quick-row
+const REACTION_EMOJIS = ['❤️', '🔥', '👏', '😂', '😮', '😢'] as const;
 
 const iconBtnStyle: React.CSSProperties = {
   background: 'rgba(255,255,255,0.06)',
@@ -37,11 +41,6 @@ const iconBtnStyle: React.CSSProperties = {
 };
 
 // ── Me-bubble gradient table (per agent) ─────────────────────────────────────
-// Each gradient uses: light variant → agent base color → dark variant.
-// Hardcoded per agent — predictable colors, no runtime computation needed.
-// Text is always #0A0A0A: the gradient's light stop at the top-left corner
-// ensures readable contrast (all light stops pass WCAG AA against near-black).
-
 const ME_BUBBLE_GRADIENTS: Record<string, string> = {
   BARON:   'linear-gradient(135deg, #F26E78 0%, #E63946 50%, #8C1F28 100%)',
   BLITZ:   'linear-gradient(135deg, #F9C99C 0%, #F4A261 50%, #A66732 100%)',
@@ -50,12 +49,9 @@ const ME_BUBBLE_GRADIENTS: Record<string, string> = {
   PULSE:   'linear-gradient(135deg, #5CC0B4 0%, #2A9D8F 50%, #1A5E56 100%)',
   ATLAS:   'linear-gradient(135deg, #9CA4AB 0%, #6C757D 50%, #42474B 100%)',
 };
-
-// Gold gradient for me-bubbles in user (IC) threads — user identity is gold-tier
 const GOLD_ME_GRADIENT = 'linear-gradient(135deg, #F4D47C 0%, #D4AF37 100%)';
 
 // ── Agent reply bank ──────────────────────────────────────────────────────────
-
 const AGENT_REPLIES: Record<string, string[]> = {
   BARON:   ['Makes sense. Watch the spread.', 'Heard. Let me look at options.', 'Add on confirmation, not anticipation.'],
   BLITZ:   ['Interesting read. Sunday tells us.', 'Watch the halftime line.', "I'd wait for the injury report."],
@@ -68,6 +64,51 @@ const AGENT_REPLIES: Record<string, string[]> = {
 function generateAgentReply(agentId: string): string {
   const pool = AGENT_REPLIES[agentId] ?? ['Noted.'];
   return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// ── useLongPress ──────────────────────────────────────────────────────────────
+// Returns pointer-event handlers to spread on any element.
+// onTrigger fires after `delay` ms of stationary press (movement > 10px cancels).
+
+function useLongPress(onTrigger: () => void, delay = 500) {
+  const timer   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const origin  = useRef<{ x: number; y: number } | null>(null);
+  const fired   = useRef(false);
+
+  const cancel = useCallback(() => {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+    origin.current = null;
+    fired.current  = false;
+  }, []);
+
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    // Only primary button / first touch
+    if (e.button !== undefined && e.button !== 0) return;
+    origin.current = { x: e.clientX, y: e.clientY };
+    fired.current  = false;
+    timer.current  = setTimeout(() => {
+      fired.current = true;
+      navigator.vibrate?.(10);
+      onTrigger();
+    }, delay);
+  }, [onTrigger, delay]);
+
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!origin.current) return;
+    const dx = e.clientX - origin.current.x;
+    const dy = e.clientY - origin.current.y;
+    if (Math.sqrt(dx * dx + dy * dy) > 10) cancel();
+  }, [cancel]);
+
+  const onPointerUp   = useCallback(() => cancel(), [cancel]);
+  const onPointerLeave = useCallback(() => cancel(), [cancel]);
+
+  // Prevent the native context menu on long-press (mobile Safari)
+  const onContextMenu = useCallback((e: React.MouseEvent) => {
+    if (fired.current) e.preventDefault();
+  }, []);
+
+  return { onPointerDown, onPointerMove, onPointerUp, onPointerLeave, onContextMenu };
 }
 
 // ── StatusIcon ────────────────────────────────────────────────────────────────
@@ -95,7 +136,6 @@ function StatusIcon({ status }: { status: MessageStatus }) {
       </svg>
     );
   }
-  // read — double check gold
   return (
     <svg width="12" height="9" viewBox="0 0 18 14" fill="none" style={{ display: 'inline', verticalAlign: 'middle' }}>
       <path d="M2 7l4 4 6-6" stroke={TOKENS.gold} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
@@ -104,338 +144,184 @@ function StatusIcon({ status }: { status: MessageStatus }) {
   );
 }
 
-// ── DMThreadScreen ────────────────────────────────────────────────────────────
+// ── ActionMenuOverlay ─────────────────────────────────────────────────────────
 
-export function DMThreadScreen() {
-  const navigate = useNavigate();
-  const { threadId = '' } = useParams();
+interface ActionMenuProps {
+  msg: DMMessage;
+  anchorRect: DOMRect;
+  agentColor: string | null;
+  onReact: (emoji: string) => void;
+  onReply: () => void;
+  onClose: () => void;
+}
 
-  const thread = DM_THREADS.find(t => t.id === threadId) ?? null;
+function ActionMenuOverlay({ msg, anchorRect, agentColor: _agentColor, onReact, onReply, onClose }: ActionMenuProps) {
+  const MENU_W = 280;
+  const isMe   = msg.from === 'me';
 
-  // Guard: unknown threadId → back to list
-  if (!thread) return <Navigate to="/dms" replace />;
+  // Horizontal center on bubble, clamped to viewport
+  const bubbleCenterX = anchorRect.left + anchorRect.width / 2;
+  let left = bubbleCenterX - MENU_W / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - MENU_W - 8));
 
-  const isAgentThread = thread.kind === 'agent';
-  const A = thread.agent ? AGENTS[thread.agent] : null;
-  const displayName = A ? A.name : `@${thread.userHandle ?? ''}`;
+  // Vertical: below if bubble in upper half, above if in lower half
+  const bubbleMidY   = anchorRect.top + anchorRect.height / 2;
+  const belowBubble  = bubbleMidY < window.innerHeight / 2;
+  const top  = belowBubble ? anchorRect.bottom + 8  : undefined;
+  const bottom = belowBubble ? undefined : window.innerHeight - anchorRect.top + 8;
 
-  // Per-thread color theming derived from agent color or gold for IC user threads
-  const agentColor        = isAgentThread && A ? A.color : null;
-  const headerBorderColor = agentColor ? agentColor + '33' : TOKENS.gold + '33'; // hex 33 ≈ 20% opacity
-  const ambientGradient   = agentColor ? agentColor + '0D' : 'rgba(212,175,55,0.05)'; // 0D ≈ 5% opacity
+  // Close on outside click or Escape
+  const overlayRef = useRef<HTMLDivElement>(null);
 
-  // Premium flag — read once; used for Part 2 free-tier gating
-  const isPremium = localStorage.getItem('sl-premium') === '1';
-  void isPremium; // TODO: Part 2 — free-tier message counter check before send
-
-  const [msgs, setMsgs]       = useState<DMMessage[]>(DM_MESSAGES[threadId] ?? []);
-  const [text, setText]       = useState('');
-  const [typing, setTyping]   = useState(false);
-  const [muted, setMuted]     = useState(thread.muted);
-  const [showMenu, setShowMenu] = useState(false);
-
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const menuRef   = useRef<HTMLDivElement>(null);
-  const inputRef  = useRef<HTMLInputElement>(null);
-
-  // Auto-scroll to bottom on new messages or typing indicator
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [msgs.length, typing]);
-
-  // Close menu on outside click
-  useEffect(() => {
-    if (!showMenu) return;
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setShowMenu(false);
-      }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const onMouse = (e: MouseEvent) => {
+      if (overlayRef.current && !overlayRef.current.contains(e.target as Node)) onClose();
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [showMenu]);
-
-  // ── Send ──────────────────────────────────────────────────────────────────
-  const send = () => {
-    if (!text.trim()) return;
-    // TODO: Part 2 adds free-tier message counter check before send
-    const msgId  = 'm' + Date.now();
-    const newMsg: DMMessage = {
-      id: msgId, from: 'me', text: text.trim(), time: 'now', status: 'sending',
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onMouse);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onMouse);
     };
-    setMsgs(m => [...m, newMsg]);
-    setText('');
+  }, [onClose]);
 
-    // Fake status progression
-    setTimeout(() => setMsgs(m => m.map(msg => msg.id === msgId ? { ...msg, status: 'sent' }      : msg)), 300);
-    setTimeout(() => setMsgs(m => m.map(msg => msg.id === msgId ? { ...msg, status: 'delivered' } : msg)), 900);
-    setTimeout(() => setMsgs(m => m.map(msg => msg.id === msgId ? { ...msg, status: 'read' }      : msg)), 2000);
-
-    // Agent auto-reply
-    if (isAgentThread && thread.agent) {
-      const agentId = thread.agent;
-      setTimeout(() => setTyping(true), 500);
-      setTimeout(() => {
-        setTyping(false);
-        setMsgs(m => [...m, {
-          id: 'reply' + Date.now(),
-          from: 'agent',
-          text: generateAgentReply(agentId),
-          time: 'now',
-        }]);
-      }, 2200);
-    }
-    // User thread: no auto-reply (silent for now — Part 2 will not add auto-reply either)
+  const handleCopy = () => {
+    navigator.clipboard?.writeText(msg.text ?? '').catch(() => {/* silent */});
+    onClose();
   };
 
-  // ── Subtitle for thread header ────────────────────────────────────────────
-  const subtitleColor = A ? A.color : TOKENS.gold;
-  const subtitleText  = isAgentThread
-    ? (thread.online ? `ONLINE · ${A!.tag.toUpperCase()}` : A!.tag.toUpperCase())
-    : (thread.online ? 'ONLINE' : 'LAST SEEN · 2H AGO');
+  const actionRowStyle = (danger = false): React.CSSProperties => ({
+    display: 'flex', alignItems: 'center', gap: 10,
+    padding: '10px 14px',
+    borderRadius: 8,
+    cursor: 'pointer',
+    color: danger ? TOKENS.down : TOKENS.text,
+    background: 'transparent',
+    border: 'none',
+    width: '100%',
+    textAlign: 'left',
+    fontFamily: FONT,
+    fontSize: 14,
+    transition: 'background 100ms',
+  });
 
   return (
     <div style={{
-      position: 'absolute', inset: 0,
-      background: TOKENS.bg,
-      display: 'flex', flexDirection: 'column',
-      fontFamily: FONT,
+      position: 'fixed', inset: 0, zIndex: 200,
+      // Backdrop: dim but not fully opaque
+      background: 'rgba(0,0,0,0.35)',
     }}>
+      <div
+        ref={overlayRef}
+        style={{
+          position: 'fixed',
+          top: top !== undefined ? top : undefined,
+          bottom: bottom !== undefined ? bottom : undefined,
+          left,
+          width: MENU_W,
+          background: TOKENS.bg1,
+          border: `1px solid ${TOKENS.line}`,
+          borderRadius: 16,
+          boxShadow: '0 10px 40px rgba(0,0,0,0.4)',
+          padding: 8,
+          animation: 'sl-fade-in 150ms ease both',
+          zIndex: 201,
+        }}
+      >
+        {/* Emoji reaction row */}
+        <div style={{
+          display: 'flex', justifyContent: 'space-around',
+          padding: '6px 4px 10px',
+          borderBottom: `1px solid ${TOKENS.line}`,
+          marginBottom: 4,
+        }}>
+          {REACTION_EMOJIS.map(emoji => (
+            <button
+              key={emoji}
+              type="button"
+              onClick={() => { onReact(emoji); onClose(); }}
+              style={{
+                width: 36, height: 36, borderRadius: '50%',
+                background: 'rgba(255,255,255,0.05)',
+                border: 'none', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 18, lineHeight: 1,
+                transition: 'transform 120ms, background 120ms',
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.25)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'; }}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
 
-      {/* ── Header ────────────────────────────────────────────────────────── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        padding: 'calc(16px + var(--ic-top-inset,0px)) 18px 10px',
-        borderBottom: `1px solid ${headerBorderColor}`,
-        flexShrink: 0,
-        position: 'relative',
-      }}>
-        {/* Back */}
-        <button type="button" onClick={() => navigate(-1)} style={iconBtnStyle}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-            <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2"
-              strokeLinecap="round" strokeLinejoin="round"/>
+        {/* Reply */}
+        <button type="button" style={actionRowStyle()} onClick={() => { onReply(); onClose(); }}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+            <path d="M9 17l-5-5 5-5M4 12h11a5 5 0 010 10h-1"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
+          Reply
         </button>
 
-        {/* Avatar (32×32) */}
-        <div style={{ position: 'relative', flexShrink: 0 }}>
-          {A ? (
-            <AgentDot agent={thread.agent!} size={32} clickable={false} />
-          ) : (
-            <div style={{
-              width: 32, height: 32, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #2a2a2a, #121212)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontFamily: FONT, fontWeight: 700, fontSize: 13, color: TOKENS.text,
-              border: `1px solid ${TOKENS.line2}`,
-            }}>
-              {thread.userInitials}
-            </div>
-          )}
-          {thread.online && (
-            <span style={{
-              position: 'absolute', bottom: 0, right: 0,
-              width: 6, height: 6, borderRadius: '50%',
-              background: '#2A9D8F',
-              border: `2px solid ${TOKENS.bg}`,
-            }} />
-          )}
-        </div>
-
-        {/* Name + subtitle */}
-        <div style={{ flex: 1, lineHeight: 1.1 }}>
-          <div style={{ fontFamily: FONT, fontSize: 14, fontWeight: 600 }}>{displayName}</div>
-          <div style={{
-            fontFamily: MONO, fontSize: 9.5, color: subtitleColor,
-            letterSpacing: 1.2, marginTop: 3,
-            display: 'flex', alignItems: 'center', gap: 5,
-          }}>
-            {thread.online && (
-              <span style={{
-                width: 5, height: 5, borderRadius: '50%',
-                background: subtitleColor,
-                animation: 'ic-pulse 1.6s ease-out infinite',
-                flexShrink: 0,
-              }} />
-            )}
-            {subtitleText}
-          </div>
-        </div>
-
-        {/* Three-dot menu button */}
-        <div style={{ position: 'relative' }} ref={menuRef}>
-          <button
-            type="button"
-            onClick={() => setShowMenu(v => !v)}
-            style={iconBtnStyle}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <circle cx="5"  cy="12" r="1.5" fill="currentColor"/>
-              <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
-              <circle cx="19" cy="12" r="1.5" fill="currentColor"/>
-            </svg>
-          </button>
-
-          {/* Dropdown menu */}
-          {showMenu && (
-            <div style={{
-              position: 'absolute', top: 42, right: 0,
-              background: TOKENS.bg1,
-              border: `1px solid ${TOKENS.line}`,
-              borderRadius: 10, padding: 6, minWidth: 180, zIndex: 10,
-              boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-            }}>
-              <MenuItem
-                label={muted ? 'Unmute notifications' : 'Mute notifications'}
-                onClick={() => { setMuted(m => !m); setShowMenu(false); }}
-                // TODO: persist mute state to backend in Part 2
-              />
-              <MenuItem
-                label="View profile"
-                onClick={() => setShowMenu(false)}
-                // TODO: navigate to /profile/:handle in Part 2
-              />
-              <MenuItem
-                label="Block"
-                onClick={() => setShowMenu(false)}
-                // TODO: call block endpoint in Part 2
-                danger
-              />
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Messages area ─────────────────────────────────────────────────── */}
-      {/* TODO Part 2: add long-press handler for reaction / reply / copy sheet */}
-      {/* TODO Part 2: add swipe-left handler for reply-to gesture */}
-      <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
-        {/* Ambient top gradient — non-scrolling, fades out after 200px */}
-        <div
-          aria-hidden
-          style={{
-            position: 'absolute', top: 0, left: 0, right: 0, height: 200,
-            background: `linear-gradient(180deg, ${ambientGradient} 0%, transparent 100%)`,
-            pointerEvents: 'none',
-            zIndex: 1,
-          }}
-        />
-        <div
-          ref={scrollRef}
-          className="no-scrollbar"
-          style={{
-            position: 'absolute', inset: 0,
-            overflowY: 'auto',
-            padding: '16px 16px 20px',
-            display: 'flex', flexDirection: 'column', gap: 8,
-          }}
+        {/* Copy */}
+        <button type="button" style={actionRowStyle()} onClick={handleCopy}
+          onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.04)'; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
         >
-        {msgs.map(msg => (
-          <MessageBubble
-            key={msg.id}
-            msg={msg}
-            agentColor={agentColor}
-            agentId={thread.agent ?? null}
-            isUserThread={!isAgentThread}
-          />
-        ))}
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+            <rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" strokeWidth="2"/>
+            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
+          Copy
+        </button>
 
-        {/* Typing indicator */}
-        {typing && (
-          <div style={{
-            alignSelf: 'flex-start',
-            padding: '12px 14px',
-            borderRadius: '16px 16px 16px 4px',
-            background: 'rgba(255,255,255,0.05)',
-            border: `1px solid ${TOKENS.line}`,
-            display: 'flex', gap: 4,
-            animation: 'sl-fade-in 300ms ease both',
-          }}>
-            {[0, 1, 2].map(i => (
-              <span key={i} style={{
-                width: 6, height: 6, borderRadius: '50%',
-                background: TOKENS.mute,
-                display: 'block',
-                animation: `sl-typing 1.2s ease-in-out ${i * 180}ms infinite`,
-              }} />
-            ))}
-          </div>
+        {/* Delete — only for 'me' messages */}
+        {isMe && (
+          <button type="button" style={actionRowStyle(true)} onClick={() => {
+            // TODO: real delete pending backend
+            onClose();
+          }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,90,95,0.08)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+              <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Delete
+          </button>
         )}
-        </div>{/* end scrollable */}
-      </div>{/* end messages wrapper */}
-
-      {/* ── Composer ──────────────────────────────────────────────────────── */}
-      <div style={{
-        padding: `10px 14px calc(16px + var(--ic-bot-inset,0px))`,
-        background: 'rgba(10,10,10,0.95)',
-        borderTop: `1px solid ${TOKENS.line}`,
-        flexShrink: 0,
-      }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          background: TOKENS.bg2,
-          border: `1px solid ${TOKENS.line2}`,
-          borderRadius: 999,
-          padding: '8px 8px 8px 14px',
-        }}>
-          {/* TODO Part 2: attachment menu — replace no-op with file picker + attachment type sheet */}
-          <button
-            type="button"
-            onClick={() => { /* TODO Part 2: attachment menu */ }}
-            style={{
-              width: 28, height: 28, borderRadius: '50%',
-              background: 'transparent', border: 'none',
-              cursor: 'pointer', color: TOKENS.mute,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"
-                stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-
-          <input
-            ref={inputRef}
-            value={text}
-            onChange={e => setText(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && send()}
-            placeholder={`Message ${displayName}…`}
-            style={{
-              flex: 1, background: 'none', border: 'none', outline: 'none',
-              color: TOKENS.text, fontFamily: FONT, fontSize: 14, minWidth: 0,
-            }}
-          />
-
-          {/* Send button */}
-          <button
-            type="button"
-            onClick={send}
-            disabled={!text.trim()}
-            style={{
-              width: 34, height: 34, borderRadius: '50%',
-              border: 'none', cursor: text.trim() ? 'pointer' : 'default',
-              background: text.trim()
-                ? 'linear-gradient(135deg, #F4D47C 0%, #D4AF37 100%)'
-                : 'rgba(255,255,255,0.08)',
-              color: text.trim() ? '#0A0A0A' : TOKENS.mute2,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0,
-              transition: 'background 200ms',
-              boxShadow: text.trim() ? '0 4px 12px rgba(212,175,55,0.35)' : 'none',
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-              <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2"
-                strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-        </div>
       </div>
+    </div>
+  );
+}
+
+// ── ReplyArrow (swipe indicator) ──────────────────────────────────────────────
+
+function ReplyArrow({ visible, side }: { visible: boolean; side: 'left' | 'right' }) {
+  return (
+    <div style={{
+      position: 'absolute',
+      top: '50%', transform: 'translateY(-50%)',
+      [side]: -28,
+      opacity: visible ? 0.85 : 0,
+      transition: 'opacity 120ms',
+      pointerEvents: 'none',
+      color: TOKENS.mute,
+    }}>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+        {side === 'left'
+          ? <path d="M9 17l-5-5 5-5M4 12h11a5 5 0 010 10h-1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          : <path d="M15 17l5-5-5-5M20 12H9a5 5 0 000 10h1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        }
+      </svg>
     </div>
   );
 }
@@ -444,68 +330,253 @@ export function DMThreadScreen() {
 
 interface MessageBubbleProps {
   msg: DMMessage;
-  agentColor: string | null;  // hex color for tint/shadow; null in user threads
-  agentId: string | null;     // for me-bubble gradient lookup; null in user threads
+  agentColor: string | null;
+  agentId: string | null;
   isUserThread: boolean;
+  allMsgs: DMMessage[];
+  highlighted: boolean;
+  onLongPress: (msg: DMMessage, rect: DOMRect) => void;
+  onReply: (msg: DMMessage) => void;
+  onReact: (msgId: string, emoji: string) => void;
+  onScrollTo: (msgId: string) => void;
+  registerRef: (id: string, el: HTMLDivElement | null) => void;
 }
 
-function MessageBubble({ msg, agentColor, agentId, isUserThread }: MessageBubbleProps) {
+// Swipe threshold (px) to trigger reply
+const SWIPE_THRESHOLD = 40;
+// Max swipe travel (px) before rubber-banding
+const SWIPE_MAX = 60;
+
+function MessageBubble({
+  msg, agentColor, agentId, isUserThread,
+  allMsgs, highlighted,
+  onLongPress, onReply, onReact, onScrollTo, registerRef,
+}: MessageBubbleProps) {
   const isMe    = msg.from === 'me';
   const isAgent = msg.from === 'agent';
-  // msg.from === 'user' → IC user thread bubble (gold tint)
 
-  // ── Background ──────────────────────────────────────────────────────────────
+  // Swipe state (touch only — desktop relies on long-press + menu)
+  const [swipeX, setSwipeX]         = useState(0);
+  const [snapBack, setSnapBack]     = useState(false);
+  const swipeTouchId                = useRef<number | null>(null);
+  const swipeOrigin                 = useRef<{ x: number; y: number } | null>(null);
+  const swipeAxis                   = useRef<'h' | 'v' | null>(null);
+  const swipeThresholdHit           = useRef(false);
+
+  const bubbleDivRef = useRef<HTMLDivElement>(null);
+
+  const wrapRef = useCallback((el: HTMLDivElement | null) => {
+    registerRef(msg.id, el);
+  }, [msg.id, registerRef]);
+
+  // ── Bubble visuals ─────────────────────────────────────────────────────────
   const bubbleBg = isMe
-    // Me bubble: agent-specific gradient in agent threads, gold in user threads
     ? (agentId && ME_BUBBLE_GRADIENTS[agentId] ? ME_BUBBLE_GRADIENTS[agentId] : GOLD_ME_GRADIENT)
     : isAgent && agentColor
-      ? agentColor + '14'           // hex 14 ≈ 8% agent color tint
+      ? agentColor + '14'
       : isUserThread
-        ? 'rgba(212,175,55,0.08)'   // IC user bubble: subtle gold tint
-        : 'rgba(255,255,255,0.05)'; // fallback
+        ? 'rgba(212,175,55,0.08)'
+        : 'rgba(255,255,255,0.05)';
 
-  // ── Border: borders only on non-me bubbles ──────────────────────────────────
   const bubbleBorder = isMe
     ? 'none'
     : isAgent
       ? `1px solid ${TOKENS.line}`
-      : `1px solid rgba(212,175,55,0.2)`;  // IC user: gold-tinted border
+      : `1px solid rgba(212,175,55,0.2)`;
 
-  // ── Gloss shadow ────────────────────────────────────────────────────────────
-  // Inset top-edge highlight + colored drop shadow underneath.
-  // Shadow color tracks the thread's theme (agent color or gold for user threads).
-  const shadowColor = agentColor ?? TOKENS.gold;
+  const shadowColor  = agentColor ?? TOKENS.gold;
   const bubbleShadow = [
-    'inset 0 1px 0 rgba(255,255,255,0.15)',   // subtle top-edge specular
-    `0 4px 12px ${shadowColor}26`,             // hex 26 ≈ 15% colored drop shadow
+    'inset 0 1px 0 rgba(255,255,255,0.15)',
+    `0 4px 12px ${shadowColor}26`,
   ].join(', ');
 
+  // ── Long-press handlers ───────────────────────────────────────────────────
+  const longPressHandlers = useLongPress(() => {
+    if (bubbleDivRef.current) {
+      onLongPress(msg, bubbleDivRef.current.getBoundingClientRect());
+    }
+  });
+
+  // ── Swipe-to-reply (touch only) ───────────────────────────────────────────
+  // me-bubble: swipe LEFT  (deltaX < 0) → reply
+  // other:     swipe RIGHT (deltaX > 0) → reply
+  const expectedSign = isMe ? -1 : 1;
+
+  function onTouchStart(e: React.TouchEvent) {
+    const t = e.changedTouches[0];
+    swipeTouchId.current  = t.identifier;
+    swipeOrigin.current   = { x: t.clientX, y: t.clientY };
+    swipeAxis.current     = null;
+    swipeThresholdHit.current = false;
+  }
+
+  function onTouchMove(e: React.TouchEvent) {
+    if (swipeTouchId.current === null || !swipeOrigin.current) return;
+    const t = Array.from(e.changedTouches).find(x => x.identifier === swipeTouchId.current);
+    if (!t) return;
+
+    const dx = t.clientX - swipeOrigin.current.x;
+    const dy = t.clientY - swipeOrigin.current.y;
+
+    // Lock axis on first meaningful movement
+    if (!swipeAxis.current) {
+      if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return;
+      swipeAxis.current = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
+    }
+
+    // If vertical scroll wins, abort swipe
+    if (swipeAxis.current === 'v') return;
+
+    // Only honor swipe in expected direction
+    if (dx * expectedSign <= 0) { setSwipeX(0); return; }
+
+    const travel = Math.abs(dx);
+    // Rubber-band beyond SWIPE_MAX
+    const clamped = travel <= SWIPE_MAX
+      ? travel
+      : SWIPE_MAX + (travel - SWIPE_MAX) * 0.25;
+    setSwipeX(clamped * expectedSign);
+
+    // Haptic on crossing threshold (once per gesture)
+    if (travel >= SWIPE_THRESHOLD && !swipeThresholdHit.current) {
+      swipeThresholdHit.current = true;
+      navigator.vibrate?.(8);
+    }
+  }
+
+  function onTouchEnd(e: React.TouchEvent) {
+    if (swipeTouchId.current === null) return;
+    const t = Array.from(e.changedTouches).find(x => x.identifier === swipeTouchId.current);
+    if (!t || !swipeOrigin.current) { resetSwipe(); return; }
+
+    const travel = Math.abs(t.clientX - swipeOrigin.current.x);
+    if (swipeAxis.current === 'h' && travel >= SWIPE_THRESHOLD) {
+      onReply(msg);
+    }
+    resetSwipe();
+  }
+
+  function resetSwipe() {
+    swipeTouchId.current  = null;
+    swipeOrigin.current   = null;
+    swipeAxis.current     = null;
+    swipeThresholdHit.current = false;
+    setSnapBack(true);
+    setSwipeX(0);
+    // Remove snapBack class after animation completes
+    setTimeout(() => setSnapBack(false), 300);
+  }
+
+  // ── Reply-to preview ───────────────────────────────────────────────────────
+  const repliedMsg = msg.replyTo ? allMsgs.find(m => m.id === msg.replyTo) : null;
+  const replyBorderColor = repliedMsg
+    ? repliedMsg.from === 'me'
+      ? TOKENS.gold
+      : repliedMsg.from === 'agent'
+        ? (agentColor ?? TOKENS.gold)
+        : TOKENS.gold
+    : TOKENS.gold;
+  const repliedSenderName = repliedMsg
+    ? repliedMsg.from === 'me'
+      ? 'You'
+      : repliedMsg.from === 'agent'
+        ? (agentId ? ((AGENTS as Record<string, typeof AGENTS[keyof typeof AGENTS]>)[agentId]?.name ?? 'Agent') : 'Agent')
+        : 'User'
+    : '';
+
+  // ── Reactions grouped ─────────────────────────────────────────────────────
+  const reactionGroups = (msg.reactions ?? []).reduce<Map<string, { count: number; byMe: boolean }>>(
+    (acc, r) => {
+      const entry = acc.get(r.emoji) ?? { count: 0, byMe: false };
+      entry.count++;
+      if (r.from === 'me') entry.byMe = true;
+      acc.set(r.emoji, entry);
+      return acc;
+    },
+    new Map()
+  );
+
+  const showReplyArrow = Math.abs(swipeX) > 8;
+
   return (
-    <div style={{
-      alignSelf: isMe ? 'flex-end' : 'flex-start',
-      maxWidth: '78%',
-      animation: 'sl-fade-in 300ms ease both',
-    }}>
-      {/* Bubble */}
-      <div style={{
-        padding: '10px 14px',
-        borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-        background: bubbleBg,
-        // Me-bubble text: always #0A0A0A — the gradient's light stop at 0% (top-left)
-        // ensures readable contrast for all 6 agents. Borderline case: ATLAS mid-gray
-        // (#6C757D) at 50%, but the overall gradient reads light-to-dark so text sits
-        // comfortably against the lighter half. Flagged: ATLAS + CIRCUIT are the darkest.
-        color: isMe ? '#0A0A0A' : TOKENS.text,
-        border: bubbleBorder,
-        fontFamily: FONT, fontSize: 14, lineHeight: 1.45,
-        boxShadow: bubbleShadow,
-        // TODO Part 2: render replyTo preview above text here
-        // TODO Part 2: render reactions row below bubble
-      }}>
-        {msg.text}
+    <div
+      ref={wrapRef}
+      style={{
+        alignSelf: isMe ? 'flex-end' : 'flex-start',
+        maxWidth: '78%',
+        animation: 'sl-fade-in 300ms ease both',
+        position: 'relative',
+        // Highlight flash
+        borderRadius: 16,
+        ...(highlighted ? { animation: 'sl-msg-highlight 600ms ease forwards' } : {}),
+      }}
+    >
+      {/* Reply-to preview above the bubble */}
+      {repliedMsg && (
+        <div
+          onClick={() => onScrollTo(repliedMsg.id)}
+          style={{
+            width: '85%',
+            alignSelf: isMe ? 'flex-end' : 'flex-start',
+            marginLeft: isMe ? 'auto' : undefined,
+            background: 'rgba(255,255,255,0.03)',
+            borderLeft: `3px solid ${replyBorderColor}`,
+            borderRadius: 8,
+            padding: '6px 10px',
+            marginBottom: 2,
+            cursor: 'pointer',
+          }}
+        >
+          <div style={{
+            fontFamily: MONO, fontSize: 10, letterSpacing: 1.2,
+            color: replyBorderColor, marginBottom: 2,
+          }}>
+            {repliedSenderName.toUpperCase()}
+          </div>
+          <div style={{
+            fontFamily: FONT, fontSize: 11, color: TOKENS.mute,
+            fontStyle: 'italic',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {(repliedMsg.text ?? '').slice(0, 60)}{(repliedMsg.text ?? '').length > 60 ? '…' : ''}
+          </div>
+        </div>
+      )}
+
+      {/* Bubble (translates during swipe) */}
+      <div
+        ref={bubbleDivRef}
+        style={{
+          position: 'relative',
+          transform: `translateX(${swipeX}px)`,
+          transition: snapBack ? 'transform 280ms cubic-bezier(0.25,1,0.5,1)' : 'none',
+          userSelect: 'none', // prevent text selection during long-press
+        }}
+        // Long-press
+        {...longPressHandlers}
+        // Swipe (touch only — comment: desktop skips swipe gesture, uses long-press + menu)
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onTouchCancel={() => resetSwipe()}
+      >
+        {/* Reply arrow indicator */}
+        <ReplyArrow visible={showReplyArrow} side={isMe ? 'right' : 'left'} />
+
+        <div style={{
+          padding: '10px 14px',
+          borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+          background: bubbleBg,
+          color: isMe ? '#0A0A0A' : TOKENS.text,
+          border: bubbleBorder,
+          fontFamily: FONT, fontSize: 14, lineHeight: 1.45,
+          boxShadow: bubbleShadow,
+        }}>
+          {msg.text}
+        </div>
       </div>
 
-      {/* Meta row: time + status icon */}
+      {/* Meta row */}
       <div style={{
         fontFamily: MONO, fontSize: 9, color: TOKENS.mute3,
         marginTop: 3,
@@ -518,6 +589,39 @@ function MessageBubble({ msg, agentColor, agentId, isUserThread }: MessageBubble
         {msg.time}
         {isMe && msg.status && <StatusIcon status={msg.status} />}
       </div>
+
+      {/* Reactions row */}
+      {reactionGroups.size > 0 && (
+        <div style={{
+          display: 'flex', flexWrap: 'wrap', gap: 4,
+          marginTop: 3,
+          justifyContent: isMe ? 'flex-end' : 'flex-start',
+        }}>
+          {Array.from(reactionGroups.entries()).map(([emoji, { count, byMe }]) => (
+            <button
+              key={emoji}
+              type="button"
+              onClick={() => onReact(msg.id, emoji)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 3,
+                padding: '3px 8px',
+                borderRadius: 999,
+                background: byMe ? 'rgba(212,175,55,0.1)' : 'rgba(255,255,255,0.06)',
+                border: byMe ? `1px solid ${TOKENS.gold}` : `1px solid ${TOKENS.line}`,
+                cursor: 'pointer',
+                fontFamily: FONT, fontSize: 14, lineHeight: 1,
+              }}
+            >
+              <span style={{ fontSize: 14 }}>{emoji}</span>
+              {count > 1 && (
+                <span style={{ fontFamily: MONO, fontSize: 10, color: TOKENS.mute2 }}>
+                  {count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -545,5 +649,594 @@ function MenuItem({ label, onClick, danger }: { label: string; onClick: () => vo
     >
       {label}
     </button>
+  );
+}
+
+// ── DMThreadScreen ────────────────────────────────────────────────────────────
+
+// Agent quota constants
+const AGENT_QUOTA = 10;
+// Counter starts showing when this many sends remain (inclusive)
+const QUOTA_WARN_THRESHOLD = 3;
+// User-thread turn-taking limit (applies to all users — it's UX pacing, not a tier gate)
+const USER_TURN_LIMIT = 2;
+
+export function DMThreadScreen() {
+  const navigate   = useNavigate();
+  const { threadId = '' } = useParams();
+
+  const thread = DM_THREADS.find(t => t.id === threadId) ?? null;
+  if (!thread) return <Navigate to="/dms" replace />;
+
+  const isAgentThread = thread.kind === 'agent';
+  const isUserThread  = !isAgentThread;
+  const A             = thread.agent ? AGENTS[thread.agent] : null;
+  const displayName   = A ? A.name : `@${thread.userHandle ?? ''}`;
+
+  const agentColor        = isAgentThread && A ? A.color : null;
+  const headerBorderColor = agentColor ? agentColor + '33' : TOKENS.gold + '33';
+  const ambientGradient   = agentColor ? agentColor + '0D' : 'rgba(212,175,55,0.05)';
+  const accentColor       = agentColor ?? TOKENS.gold;
+
+  // Read once at render-time — premium flag is stable per page load
+  const isPremium = localStorage.getItem('sl-premium') === '1';
+
+  // ── Quota keys ─────────────────────────────────────────────────────────────
+  // Agent quota: per-agent count of messages sent by free users.
+  // sl-dm-count-{AGENT_ID}
+  const agentQuotaKey = isAgentThread && thread.agent ? `sl-dm-count-${thread.agent}` : '';
+  // User-thread wait count: consecutive 'me' messages sent in this user thread.
+  // Persisted so reload reflects the same state.
+  // sl-dm-wait-{threadId}
+  const userWaitKey   = isUserThread ? `sl-dm-wait-${threadId}` : '';
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  const [msgs, setMsgs]         = useState<DMMessage[]>(DM_MESSAGES[threadId] ?? []);
+  const [text, setText]         = useState('');
+  const [typing, setTyping]     = useState(false);
+  const [muted, setMuted]       = useState(() => isThreadMuted(threadId, thread.muted));
+  const [showMenu, setShowMenu] = useState(false);
+  const [replyingTo, setReplyingTo]   = useState<DMMessage | null>(null);
+  const [actionMenu, setActionMenu]   = useState<{ msg: DMMessage; rect: DOMRect } | null>(null);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+
+  // Fix 1: agent-pending tracks the window between user sending and agent reply arriving
+  const [agentPending, setAgentPending] = useState(false);
+
+  // Fix 2: free-user quota counter for agent threads
+  const [sentCount, setSentCount] = useState<number>(() => {
+    if (!isAgentThread || !agentQuotaKey || isPremium) return 0;
+    return parseInt(localStorage.getItem(agentQuotaKey) ?? '0', 10);
+  });
+
+  // Fix 3 (user threads): persisted consecutive 'me' message count for turn-taking
+  const [consecutiveMeCount, setConsecutiveMeCount] = useState<number>(() => {
+    if (!isUserThread || !userWaitKey) return 0;
+    // Cap at USER_TURN_LIMIT so we don't need to reason about higher values
+    return Math.min(parseInt(localStorage.getItem(userWaitKey) ?? '0', 10), USER_TURN_LIMIT);
+  });
+
+  // ── Derived composer states ────────────────────────────────────────────────
+  // remaining: how many free sends left (only relevant for free agent-thread users)
+  const remaining      = AGENT_QUOTA - sentCount;
+  // Quota exhausted: free + agent thread + no sends left
+  const quotaExhausted = !isPremium && isAgentThread && remaining <= 0;
+  // Show counter only when within the warn threshold and not yet exhausted
+  const showCounter    = !isPremium && isAgentThread && !quotaExhausted && remaining <= QUOTA_WARN_THRESHOLD;
+  // User-thread turn-taking: show "waiting" when consecutive me-count hits limit
+  const waitingForReply = isUserThread && consecutiveMeCount >= USER_TURN_LIMIT;
+  // Composer is fully locked (no input allowed)
+  const composerLocked = quotaExhausted || waitingForReply;
+
+  // ── Refs ───────────────────────────────────────────────────────────────────
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const menuRef   = useRef<HTMLDivElement>(null);
+  const inputRef  = useRef<HTMLInputElement>(null);
+  // Cancellable timers for agent typing + reply
+  const pendingTypingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingReplyTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Message element map for scroll-to-original
+  const msgRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  const registerRef = useCallback((id: string, el: HTMLDivElement | null) => {
+    if (el) msgRefs.current.set(id, el);
+    else    msgRefs.current.delete(id);
+  }, []);
+
+  // ── Effects ────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [msgs.length, typing]);
+
+  useEffect(() => {
+    if (!showMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setShowMenu(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showMenu]);
+
+  // Cleanup timers on unmount so they don't fire after navigation
+  useEffect(() => {
+    return () => {
+      if (pendingTypingTimer.current) clearTimeout(pendingTypingTimer.current);
+      if (pendingReplyTimer.current)  clearTimeout(pendingReplyTimer.current);
+    };
+  }, []);
+
+  // ── Fix 1: Stop reply ──────────────────────────────────────────────────────
+  // Cancels both pending timers, clears typing indicator, re-enables composer.
+  const stopReply = useCallback(() => {
+    if (pendingTypingTimer.current) { clearTimeout(pendingTypingTimer.current); pendingTypingTimer.current = null; }
+    if (pendingReplyTimer.current)  { clearTimeout(pendingReplyTimer.current);  pendingReplyTimer.current  = null; }
+    setTyping(false);
+    setAgentPending(false);
+  }, []);
+
+  // ── Mute toggle ───────────────────────────────────────────────────────────
+  const toggleMute = () => {
+    setMuted(m => {
+      const next = !m;
+      setThreadMuted(threadId, next);
+      return next;
+    });
+    setShowMenu(false);
+  };
+
+  // ── Action menu callbacks ──────────────────────────────────────────────────
+  const handleLongPress = useCallback((msg: DMMessage, rect: DOMRect) => {
+    setActionMenu({ msg, rect });
+  }, []);
+
+  const handleMenuReact = (emoji: string) => {
+    if (!actionMenu) return;
+    applyReaction(actionMenu.msg.id, emoji);
+  };
+
+  // ── Reaction toggle ────────────────────────────────────────────────────────
+  function applyReaction(msgId: string, emoji: string) {
+    setMsgs(prev => prev.map(m => {
+      if (m.id !== msgId) return m;
+      const reactions = m.reactions ?? [];
+      const alreadyReacted = reactions.some(r => r.emoji === emoji && r.from === 'me');
+      const next = alreadyReacted
+        ? reactions.filter(r => !(r.emoji === emoji && r.from === 'me'))
+        : [...reactions, { emoji, from: 'me' as const }];
+      return { ...m, reactions: next };
+    }));
+  }
+
+  // ── Scroll-to-original with highlight flash ────────────────────────────────
+  const handleScrollTo = useCallback((msgId: string) => {
+    const el = msgRefs.current.get(msgId);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setHighlightedId(msgId);
+    setTimeout(() => setHighlightedId(null), 700);
+  }, []);
+
+  // ── Send ───────────────────────────────────────────────────────────────────
+  const send = () => {
+    if (!text.trim() || composerLocked || agentPending) return;
+
+    const msgId  = 'm' + Date.now();
+    const newMsg: DMMessage = {
+      id: msgId, from: 'me', text: text.trim(), time: 'now', status: 'sending',
+      ...(replyingTo ? { replyTo: replyingTo.id } : {}),
+    };
+    setMsgs(m => [...m, newMsg]);
+    setText('');
+    setReplyingTo(null);
+
+    // Status progression
+    setTimeout(() => setMsgs(m => m.map(msg => msg.id === msgId ? { ...msg, status: 'sent' }      : msg)), 300);
+    setTimeout(() => setMsgs(m => m.map(msg => msg.id === msgId ? { ...msg, status: 'delivered' } : msg)), 900);
+    setTimeout(() => setMsgs(m => m.map(msg => msg.id === msgId ? { ...msg, status: 'read' }      : msg)), 2000);
+
+    // Fix 2: increment quota counter for free users on agent threads
+    if (!isPremium && isAgentThread && agentQuotaKey) {
+      const next = sentCount + 1;
+      setSentCount(next);
+      localStorage.setItem(agentQuotaKey, String(next));
+    }
+
+    // Fix 3: increment consecutive-me counter for user threads
+    if (isUserThread && userWaitKey) {
+      const next = Math.min(consecutiveMeCount + 1, USER_TURN_LIMIT);
+      setConsecutiveMeCount(next);
+      localStorage.setItem(userWaitKey, String(next));
+    }
+
+    // Fix 1: agent auto-reply with cancellable timers (agent threads only)
+    if (isAgentThread && thread.agent) {
+      const agentId = thread.agent;
+      setAgentPending(true);
+      pendingTypingTimer.current = setTimeout(() => {
+        setTyping(true);
+        pendingTypingTimer.current = null;
+      }, 500);
+      pendingReplyTimer.current = setTimeout(() => {
+        setTyping(false);
+        setAgentPending(false);
+        pendingReplyTimer.current = null;
+        setMsgs(m => [...m, {
+          id: 'reply' + Date.now(),
+          from: 'agent',
+          text: generateAgentReply(agentId),
+          time: 'now',
+        }]);
+      }, 2200);
+    }
+  };
+
+  // ── Subtitle for thread header ────────────────────────────────────────────
+  const subtitleColor = A ? A.color : TOKENS.gold;
+  const subtitleText  = isAgentThread
+    ? (thread.online ? `ONLINE · ${A!.tag.toUpperCase()}` : A!.tag.toUpperCase())
+    : (thread.online ? 'ONLINE' : 'LAST SEEN · 2H AGO');
+
+  // ── Shared button styles ───────────────────────────────────────────────────
+  // Re-used for send / stop / lock buttons (same 34×34 circular shape)
+  const sendBtnBase: React.CSSProperties = {
+    width: 34, height: 34, borderRadius: '50%',
+    border: 'none', cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0, transition: 'background 200ms',
+  };
+  const goldBtnStyle: React.CSSProperties = {
+    ...sendBtnBase,
+    background: 'linear-gradient(135deg, #F4D47C 0%, #D4AF37 100%)',
+    color: '#0A0A0A',
+    boxShadow: '0 4px 12px rgba(212,175,55,0.35)',
+  };
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0,
+      background: TOKENS.bg,
+      display: 'flex', flexDirection: 'column',
+      fontFamily: FONT,
+    }}>
+
+      {/* ── Action menu overlay ──────────────────────────────────────────── */}
+      {actionMenu && (
+        <ActionMenuOverlay
+          msg={actionMenu.msg}
+          anchorRect={actionMenu.rect}
+          agentColor={agentColor}
+          onReact={handleMenuReact}
+          onReply={() => setReplyingTo(actionMenu.msg)}
+          onClose={() => setActionMenu(null)}
+        />
+      )}
+
+      {/* ── Header ────────────────────────────────────────────────────────── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: 'calc(16px + var(--ic-top-inset,0px)) 18px 10px',
+        borderBottom: `1px solid ${headerBorderColor}`,
+        flexShrink: 0,
+        position: 'relative',
+      }}>
+        <button type="button" onClick={() => navigate(-1)} style={iconBtnStyle}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2"
+              strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          {A ? (
+            <AgentDot agent={thread.agent!} size={32} clickable={false} />
+          ) : (
+            <div style={{
+              width: 32, height: 32, borderRadius: '50%',
+              background: 'linear-gradient(135deg, #2a2a2a, #121212)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontFamily: FONT, fontWeight: 700, fontSize: 13, color: TOKENS.text,
+              border: `1px solid ${TOKENS.line2}`,
+            }}>
+              {thread.userInitials}
+            </div>
+          )}
+          {thread.online && (
+            <span style={{
+              position: 'absolute', bottom: 0, right: 0,
+              width: 6, height: 6, borderRadius: '50%',
+              background: '#2A9D8F',
+              border: `2px solid ${TOKENS.bg}`,
+            }} />
+          )}
+        </div>
+
+        <div style={{ flex: 1, lineHeight: 1.1 }}>
+          <div style={{ fontFamily: FONT, fontSize: 14, fontWeight: 600 }}>{displayName}</div>
+          <div style={{
+            fontFamily: MONO, fontSize: 9.5, color: subtitleColor,
+            letterSpacing: 1.2, marginTop: 3,
+            display: 'flex', alignItems: 'center', gap: 5,
+          }}>
+            {thread.online && (
+              <span style={{
+                width: 5, height: 5, borderRadius: '50%',
+                background: subtitleColor,
+                animation: 'ic-pulse 1.6s ease-out infinite',
+                flexShrink: 0,
+              }} />
+            )}
+            {subtitleText}
+          </div>
+        </div>
+
+        <div style={{ position: 'relative' }} ref={menuRef}>
+          <button type="button" onClick={() => setShowMenu(v => !v)} style={iconBtnStyle}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <circle cx="5"  cy="12" r="1.5" fill="currentColor"/>
+              <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+              <circle cx="19" cy="12" r="1.5" fill="currentColor"/>
+            </svg>
+          </button>
+
+          {showMenu && (
+            <div style={{
+              position: 'absolute', top: 42, right: 0,
+              background: TOKENS.bg1,
+              border: `1px solid ${TOKENS.line}`,
+              borderRadius: 10, padding: 6, minWidth: 180, zIndex: 10,
+              boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+            }}>
+              <MenuItem
+                label={muted ? 'Unmute notifications' : 'Mute notifications'}
+                onClick={toggleMute}
+              />
+              <MenuItem
+                label="View profile"
+                onClick={() => setShowMenu(false)}
+                // TODO: navigate to /profile/:handle
+              />
+              <MenuItem
+                label="Block"
+                onClick={() => setShowMenu(false)}
+                // TODO: call block endpoint
+                danger
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Messages area ─────────────────────────────────────────────────── */}
+      <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute', top: 0, left: 0, right: 0, height: 200,
+            background: `linear-gradient(180deg, ${ambientGradient} 0%, transparent 100%)`,
+            pointerEvents: 'none',
+            zIndex: 1,
+          }}
+        />
+        <div
+          ref={scrollRef}
+          className="no-scrollbar"
+          style={{
+            position: 'absolute', inset: 0,
+            overflowY: 'auto',
+            padding: '16px 20px 20px',
+            display: 'flex', flexDirection: 'column', gap: 8,
+          }}
+        >
+          {msgs.map(msg => (
+            <MessageBubble
+              key={msg.id}
+              msg={msg}
+              agentColor={agentColor}
+              agentId={thread.agent ?? null}
+              isUserThread={isUserThread}
+              allMsgs={msgs}
+              highlighted={highlightedId === msg.id}
+              onLongPress={handleLongPress}
+              onReply={setReplyingTo}
+              onReact={applyReaction}
+              onScrollTo={handleScrollTo}
+              registerRef={registerRef}
+            />
+          ))}
+
+          {/* Typing indicator */}
+          {typing && (
+            <div style={{
+              alignSelf: 'flex-start',
+              padding: '12px 14px',
+              borderRadius: '16px 16px 16px 4px',
+              background: 'rgba(255,255,255,0.05)',
+              border: `1px solid ${TOKENS.line}`,
+              display: 'flex', gap: 4,
+              animation: 'sl-fade-in 300ms ease both',
+            }}>
+              {[0, 1, 2].map(i => (
+                <span key={i} style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: TOKENS.mute,
+                  display: 'block',
+                  animation: `sl-typing 1.2s ease-in-out ${i * 180}ms infinite`,
+                }} />
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Reply chip ────────────────────────────────────────────────────── */}
+      {replyingTo && (
+        <div style={{
+          display: 'flex', alignItems: 'center',
+          padding: '8px 14px',
+          background: 'rgba(255,255,255,0.03)',
+          borderTop: `1px solid ${TOKENS.line}`,
+          gap: 10,
+          flexShrink: 0,
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              fontFamily: MONO, fontSize: 10, letterSpacing: 1.4,
+              color: accentColor, marginBottom: 2,
+            }}>
+              REPLYING TO {replyingTo.from === 'me' ? 'YOU' : replyingTo.from === 'agent' ? (A?.name ?? 'AGENT').toUpperCase() : 'USER'}
+            </div>
+            <div style={{
+              fontFamily: FONT, fontSize: 12, color: TOKENS.mute,
+              fontStyle: 'italic',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {replyingTo.text}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setReplyingTo(null)}
+            style={{
+              width: 24, height: 24, borderRadius: '50%',
+              background: 'rgba(255,255,255,0.08)',
+              border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: TOKENS.mute2, flexShrink: 0,
+            }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+              <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* ── Composer wrapper ───────────────────────────────────────────────── */}
+      <div style={{
+        background: 'rgba(10,10,10,0.95)',
+        borderTop: `1px solid ${TOKENS.line}`,
+        flexShrink: 0,
+      }}>
+        {/* ── Fix 2: quota counter (free agent threads, 1-3 remaining) ── */}
+        {showCounter && (
+          <div style={{
+            padding: '5px 18px 0',
+            display: 'flex', justifyContent: 'flex-end',
+          }}>
+            <span style={{
+              fontFamily: MONO, fontSize: 10, letterSpacing: 1.2,
+              color: remaining === 1 ? TOKENS.down : TOKENS.mute2,
+            }}>
+              {remaining} of {AGENT_QUOTA} remaining
+            </span>
+          </div>
+        )}
+
+        {/* ── Fix 3: user-thread waiting label ── */}
+        {waitingForReply && (
+          <div style={{
+            padding: '5px 18px 0',
+            display: 'flex', justifyContent: 'center',
+          }}>
+            <span style={{
+              fontFamily: MONO, fontSize: 10, letterSpacing: 1.4, color: TOKENS.mute2,
+            }}>
+              WAITING FOR REPLY
+            </span>
+          </div>
+        )}
+
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          background: TOKENS.bg2,
+          border: `1px solid ${TOKENS.line2}`,
+          borderRadius: 999,
+          padding: '8px 8px 8px 14px',
+          margin: `10px 14px calc(16px + var(--ic-bot-inset,0px))`,
+        }}>
+          {/* Paperclip — disabled (→ paywall) when quota exhausted */}
+          <button
+            type="button"
+            onClick={quotaExhausted ? () => navigate('/paywall') : () => { /* TODO Part 2c: attachment menu */ }}
+            style={{
+              width: 28, height: 28, borderRadius: '50%',
+              background: 'transparent', border: 'none',
+              cursor: 'pointer',
+              color: quotaExhausted ? TOKENS.mute3 : TOKENS.mute,
+              opacity: quotaExhausted ? 0.4 : 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"
+                stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+
+          {/* Input — locked when quota exhausted or waiting for reply */}
+          <input
+            ref={inputRef}
+            value={text}
+            onChange={e => !composerLocked && setText(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && !composerLocked && send()}
+            readOnly={composerLocked}
+            placeholder={
+              quotaExhausted   ? 'Upgrade to Inner Circle to continue' :
+              waitingForReply  ? 'Waiting for reply...' :
+              `Message ${displayName}…`
+            }
+            style={{
+              flex: 1, border: 'none', outline: 'none',
+              fontFamily: FONT, fontSize: 14, minWidth: 0,
+              color: composerLocked ? TOKENS.mute2 : TOKENS.text,
+              background: composerLocked ? 'rgba(255,255,255,0.02)' : 'none',
+              cursor: composerLocked ? 'not-allowed' : 'text',
+            }}
+          />
+
+          {/* ── Send / Stop / Lock button ── */}
+          {agentPending ? (
+            // Fix 1: Stop button — cancels pending agent reply
+            <button type="button" onClick={stopReply} style={goldBtnStyle}>
+              {/* Rounded-square stop icon (Claude-style) */}
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <rect x="0.5" y="0.5" width="12" height="12" rx="3" fill="currentColor"/>
+              </svg>
+            </button>
+          ) : quotaExhausted ? (
+            // Fix 2: Lock button — navigates to paywall
+            <button type="button" onClick={() => navigate('/paywall')} style={goldBtnStyle}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="2"/>
+                <path d="M7 11V7a5 5 0 0110 0v4"
+                  stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </button>
+          ) : (
+            // Normal send button
+            <button
+              type="button"
+              onClick={send}
+              disabled={!text.trim() || waitingForReply}
+              style={{
+                ...sendBtnBase,
+                cursor: (text.trim() && !waitingForReply) ? 'pointer' : 'default',
+                background: (text.trim() && !waitingForReply)
+                  ? 'linear-gradient(135deg, #F4D47C 0%, #D4AF37 100%)'
+                  : 'rgba(255,255,255,0.08)',
+                color: (text.trim() && !waitingForReply) ? '#0A0A0A' : TOKENS.mute2,
+                boxShadow: (text.trim() && !waitingForReply) ? '0 4px 12px rgba(212,175,55,0.35)' : 'none',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2"
+                  strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
