@@ -1,4 +1,5 @@
 import type { Post, LeaderboardEntry } from './types';
+import { AGENTS } from './design-tokens';
 import type { AgentId } from './design-tokens';
 
 export const POSTS: Post[] = [
@@ -246,4 +247,268 @@ export function fmtCompact(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1) + 'M';
   if (n >= 1_000) return (n / 1_000).toFixed(n >= 10_000 ? 0 : 1) + 'K';
   return String(n);
+}
+
+// ─── User profile types ───────────────────────────────────────────────────────
+
+export type CreatorsClubStatus = {
+  category: AgentId;
+  memberSinceWeeks: number;
+};
+
+export type ArenaBadge = {
+  agent: AgentId;
+  categoryName: string;
+  rank: number;
+  total: number;
+};
+
+export type UserProfile = {
+  handle: string;
+  displayName: string;
+  bio: string;
+  avatarInitials: string;
+  signalScore: number;
+  followers: number;
+  following: number;
+  postCount: number;
+  isPremium: boolean;
+  creatorsClub?: CreatorsClubStatus;
+  arenaBadges: ArenaBadge[];
+  joinedDate: string;
+};
+
+// ─── Current logged-in user ───────────────────────────────────────────────────
+
+export const CURRENT_USER: UserProfile = {
+  handle: 'vinay',
+  displayName: 'Vinay',
+  bio: 'Building social leveling. Posting across Finance, Tech, and Fitness.',
+  avatarInitials: 'V',
+  signalScore: 412,
+  followers: 156,
+  following: 23,
+  postCount: 42,
+  isPremium: false, // overridden at runtime by localStorage sl-premium
+  arenaBadges: [
+    { agent: 'BARON',   categoryName: 'Finance', rank: 12, total: 2300 },
+    { agent: 'CIRCUIT', categoryName: 'Tech',    rank: 47, total: 4500 },
+    { agent: 'PULSE',   categoryName: 'Fitness', rank: 89, total: 1800 },
+  ],
+  joinedDate: 'Jan 2026',
+};
+
+// ─── Mock users (Part 2 will wire /profile/:handle) ──────────────────────────
+
+export const MOCK_USERS: Record<string, UserProfile> = {
+  devon_w: {
+    handle: 'devon_w',
+    displayName: 'Devon W',
+    bio: 'Derivatives trader. Options, vol, sometimes opinions.',
+    avatarInitials: 'DW',
+    signalScore: 1847,
+    followers: 3200,
+    following: 142,
+    postCount: 289,
+    isPremium: true,
+    creatorsClub: { category: 'BARON', memberSinceWeeks: 6 },
+    arenaBadges: [
+      { agent: 'BARON', categoryName: 'Finance',  rank: 3,  total: 2300 },
+      { agent: 'ATLAS', categoryName: 'Politics', rank: 67, total: 1100 },
+    ],
+    joinedDate: 'Jun 2025',
+  },
+  nina_j: {
+    handle: 'nina_j',
+    displayName: 'Nina J',
+    bio: 'Tech optimist. ML, infra, occasional hot takes.',
+    avatarInitials: 'NJ',
+    signalScore: 1234,
+    followers: 2100,
+    following: 89,
+    postCount: 176,
+    isPremium: true,
+    creatorsClub: { category: 'CIRCUIT', memberSinceWeeks: 2 },
+    arenaBadges: [
+      { agent: 'CIRCUIT', categoryName: 'Tech',    rank: 8,  total: 4500 },
+      { agent: 'BARON',   categoryName: 'Finance', rank: 52, total: 2300 },
+    ],
+    joinedDate: 'Sep 2025',
+  },
+  marcus_chen: {
+    handle: 'marcus_chen',
+    displayName: 'Marcus Chen',
+    bio: 'Lifting, running, and posting about both.',
+    avatarInitials: 'MC',
+    signalScore: 287,
+    followers: 94,
+    following: 112,
+    postCount: 31,
+    isPremium: false,
+    arenaBadges: [
+      { agent: 'PULSE', categoryName: 'Fitness', rank: 34, total: 1800 },
+    ],
+    joinedDate: 'Mar 2026',
+  },
+  sara_v: {
+    handle: 'sara_v',
+    displayName: 'Sara V',
+    bio: 'Engineer. Currently obsessed with rust.',
+    avatarInitials: 'SV',
+    signalScore: 2103,
+    followers: 4800,
+    following: 203,
+    postCount: 412,
+    isPremium: true,
+    creatorsClub: { category: 'CIRCUIT', memberSinceWeeks: 10 },
+    arenaBadges: [
+      { agent: 'CIRCUIT', categoryName: 'Tech',          rank: 1,  total: 4500 },
+      { agent: 'ATLAS',   categoryName: 'Politics',      rank: 15, total: 1100 },
+      { agent: 'REEL',    categoryName: 'Entertainment', rank: 78, total: 950  },
+    ],
+    joinedDate: 'Nov 2024',
+  },
+  alex_p: {
+    handle: 'alex_p',
+    displayName: 'Alex P',
+    bio: 'Sports takes. Often wrong, always loud.',
+    avatarInitials: 'AP',
+    signalScore: 756,
+    followers: 530,
+    following: 67,
+    postCount: 98,
+    isPremium: false,
+    arenaBadges: [
+      { agent: 'BLITZ', categoryName: 'Sports', rank: 22, total: 3800 },
+    ],
+    joinedDate: 'Aug 2025',
+  },
+  jamie_r: {
+    handle: 'jamie_r',
+    displayName: 'Jamie R',
+    bio: 'Film nerd, TV critic, occasional director.',
+    avatarInitials: 'JR',
+    signalScore: 1520,
+    followers: 1900,
+    following: 145,
+    postCount: 245,
+    isPremium: true,
+    creatorsClub: { category: 'REEL', memberSinceWeeks: 4 },
+    arenaBadges: [
+      { agent: 'REEL', categoryName: 'Entertainment', rank: 5, total: 950 },
+    ],
+    joinedDate: 'Feb 2025',
+  },
+  priya_k: {
+    handle: 'priya_k',
+    displayName: 'Priya K',
+    bio: 'Policy, politics, and the spaces between.',
+    avatarInitials: 'PK',
+    signalScore: 892,
+    followers: 1240,
+    following: 78,
+    postCount: 134,
+    isPremium: false,
+    arenaBadges: [
+      { agent: 'ATLAS', categoryName: 'Politics', rank: 11, total: 1100 },
+    ],
+    joinedDate: 'Jul 2025',
+  },
+  rafael_m: {
+    handle: 'rafael_m',
+    displayName: 'Rafael M',
+    bio: 'Day trader. Mostly learning, sometimes winning.',
+    avatarInitials: 'RM',
+    signalScore: 148,
+    followers: 42,
+    following: 201,
+    postCount: 14,
+    isPremium: false,
+    arenaBadges: [
+      { agent: 'BARON', categoryName: 'Finance', rank: 94, total: 2300 },
+    ],
+    joinedDate: 'Feb 2026',
+  },
+  kira_l: {
+    handle: 'kira_l',
+    displayName: 'Kira L',
+    bio: 'Marathon runner. I post when I can walk.',
+    avatarInitials: 'KL',
+    signalScore: 567,
+    followers: 340,
+    following: 56,
+    postCount: 72,
+    isPremium: false,
+    arenaBadges: [
+      { agent: 'PULSE', categoryName: 'Fitness', rank: 19, total: 1800 },
+    ],
+    joinedDate: 'May 2025',
+  },
+  ben_t: {
+    handle: 'ben_t',
+    displayName: 'Ben T',
+    bio: 'Football tactics, cricket stats, ongoing arguments.',
+    avatarInitials: 'BT',
+    signalScore: 2890,
+    followers: 6200,
+    following: 189,
+    postCount: 534,
+    isPremium: true,
+    creatorsClub: { category: 'BLITZ', memberSinceWeeks: 12 },
+    arenaBadges: [
+      { agent: 'BLITZ', categoryName: 'Sports', rank: 2, total: 3800 },
+    ],
+    joinedDate: 'Oct 2024',
+  },
+  sam_ok: {
+    handle: 'sam_ok',
+    displayName: 'Sam OK',
+    bio: 'New here. Figuring it out.',
+    avatarInitials: 'SO',
+    signalScore: 28,
+    followers: 8,
+    following: 34,
+    postCount: 2,
+    isPremium: false,
+    arenaBadges: [],
+    joinedDate: 'Apr 2026',
+  },
+};
+
+// ─── Profile post types + helpers ─────────────────────────────────────────────
+
+export type ProfilePost = {
+  id: string;
+  thumbnailUrl: string;
+  agent: AgentId;
+};
+
+// Generates a simple SVG thumbnail — agent-color tinted, number watermark.
+// encodeURIComponent handles all characters safely (no btoa latin-1 constraint).
+function generatePostThumbnail(agent: AgentId, idx: number): string {
+  const color = AGENTS[agent]?.color ?? '#D4AF37';
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">` +
+    `<rect width="200" height="200" fill="#0A0A0A"/>` +
+    `<rect x="10" y="10" width="180" height="180" fill="${color}" opacity="0.1"/>` +
+    `<text x="100" y="110" fill="${color}" font-family="monospace" font-size="48"` +
+    ` text-anchor="middle" opacity="0.3">${idx + 1}</text>` +
+    `</svg>`;
+  return 'data:image/svg+xml,' + encodeURIComponent(svg);
+}
+
+// Generates all posts for a user, cycling through their arena badge agents.
+export function getPostsForUser(user: UserProfile): ProfilePost[] {
+  const posts: ProfilePost[] = [];
+  const agents = user.arenaBadges.map(b => b.agent);
+  if (agents.length === 0) agents.push('BARON'); // fallback for badge-less users
+  for (let i = 0; i < user.postCount; i++) {
+    const agent = agents[i % agents.length];
+    posts.push({
+      id: `${user.handle}-post-${i}`,
+      thumbnailUrl: generatePostThumbnail(agent, i),
+      agent,
+    });
+  }
+  return posts;
 }

@@ -35,8 +35,8 @@ export function App() {
         <Route path="/leaderboard" element={<ArenasHubScreen />} />
         <Route path="/leaderboard/:category" element={<CategoryLeaderboardScreen />} />
         <Route path="/explore" element={<ExploreScreen />} />
-        <Route path="/profile" element={<PlaceholderScreen title="Profile" note="Port next: agent profile with orbit avatar + stats." />} />
-        <Route path="/profile/:agent" element={<ProfileScreen />} />
+        <Route path="/profile" element={<ProfileScreen />} />
+        {/* /profile/:handle — UserProfileScreen (Part 2) */}
         <Route path="/post/:id" element={<PostDetailScreen />} />
         <Route path="/notifications" element={<NotificationsScreen />} />
         <Route path="/settings" element={<SettingsScreen />} />
