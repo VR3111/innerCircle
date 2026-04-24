@@ -1190,7 +1190,7 @@ export function DMThreadScreen() {
               flex: 1, border: 'none', outline: 'none',
               fontFamily: FONT, fontSize: 14, minWidth: 0,
               color: composerLocked ? TOKENS.mute2 : TOKENS.text,
-              background: composerLocked ? 'rgba(255,255,255,0.02)' : 'none',
+              background: 'none',
               cursor: composerLocked ? 'not-allowed' : 'text',
             }}
           />
