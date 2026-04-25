@@ -191,6 +191,59 @@ export function ProfileScreen() {
           </div>
         </div>
 
+        {/* ── Action buttons ───────────────────────────────────────────────── */}
+        <div style={{ marginTop: 20, padding: '0 20px' }}>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              type="button"
+              onClick={() => { /* TODO: Edit flow in future prompt */ }}
+              style={{
+                flex: 1, height: 42, borderRadius: 12,
+                background: 'rgba(255,255,255,0.04)',
+                border: `1px solid ${TOKENS.line}`,
+                color: TOKENS.text,
+                fontFamily: FONT, fontSize: 14, fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              Edit Profile
+            </button>
+            <button
+              type="button"
+              onClick={() => { /* TODO: Share profile */ }}
+              style={{
+                flex: 1, height: 42, borderRadius: 12,
+                background: 'rgba(255,255,255,0.04)',
+                border: `1px solid ${TOKENS.line}`,
+                color: TOKENS.text,
+                fontFamily: FONT, fontSize: 14, fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              Share Profile
+            </button>
+          </div>
+
+          {/* Upgrade button — free users only */}
+          {!user.isPremium && (
+            <button
+              type="button"
+              onClick={() => navigate('/paywall')}
+              style={{
+                width: '100%', height: 42, borderRadius: 12, marginTop: 10,
+                background: 'linear-gradient(135deg, #F4D47C 0%, #D4AF37 100%)',
+                border: 'none',
+                color: '#0A0A0A',
+                fontFamily: FONT, fontSize: 14, fontWeight: 600,
+                cursor: 'pointer',
+                boxShadow: '0 4px 16px rgba(212,175,55,0.35)',
+              }}
+            >
+              Upgrade to Inner Circle
+            </button>
+          )}
+        </div>
+
         {/* ── Signal score block ───────────────────────────────────────────── */}
         <div style={{ marginTop: 18, padding: '0 20px', position: 'relative' }}>
           <div
@@ -352,59 +405,6 @@ export function ProfileScreen() {
           </div>
         )}
 
-        {/* ── Action buttons ───────────────────────────────────────────────── */}
-        <div style={{ marginTop: 20, padding: '0 20px' }}>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button
-              type="button"
-              onClick={() => { /* TODO: Edit flow in future prompt */ }}
-              style={{
-                flex: 1, height: 42, borderRadius: 12,
-                background: 'rgba(255,255,255,0.04)',
-                border: `1px solid ${TOKENS.line}`,
-                color: TOKENS.text,
-                fontFamily: FONT, fontSize: 14, fontWeight: 500,
-                cursor: 'pointer',
-              }}
-            >
-              Edit Profile
-            </button>
-            <button
-              type="button"
-              onClick={() => { /* TODO: Share profile */ }}
-              style={{
-                flex: 1, height: 42, borderRadius: 12,
-                background: 'rgba(255,255,255,0.04)',
-                border: `1px solid ${TOKENS.line}`,
-                color: TOKENS.text,
-                fontFamily: FONT, fontSize: 14, fontWeight: 500,
-                cursor: 'pointer',
-              }}
-            >
-              Share Profile
-            </button>
-          </div>
-
-          {/* Upgrade button — free users only */}
-          {!user.isPremium && (
-            <button
-              type="button"
-              onClick={() => navigate('/paywall')}
-              style={{
-                width: '100%', height: 42, borderRadius: 12, marginTop: 10,
-                background: 'linear-gradient(135deg, #F4D47C 0%, #D4AF37 100%)',
-                border: 'none',
-                color: '#0A0A0A',
-                fontFamily: FONT, fontSize: 14, fontWeight: 600,
-                cursor: 'pointer',
-                boxShadow: '0 4px 16px rgba(212,175,55,0.35)',
-              }}
-            >
-              Upgrade to Inner Circle
-            </button>
-          )}
-        </div>
-
         {/* ── Post grid ────────────────────────────────────────────────────── */}
         <div style={{ marginTop: 24 }}>
           <div style={{
@@ -428,14 +428,15 @@ export function ProfileScreen() {
               gap: 2,
             }}>
               {posts.map(post => (
-                // Part 2: onClick navigates to /post/{postId}
                 <div
                   key={post.id}
+                  onClick={() => navigate('/post/' + post.id)}
                   style={{
                     aspectRatio: '1 / 1',
                     backgroundImage: `url(${post.thumbnailUrl})`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
+                    cursor: 'pointer',
                   }}
                 />
               ))}

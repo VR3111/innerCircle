@@ -565,14 +565,15 @@ export function UserProfileScreen() {
               gap: 2,
             }}>
               {posts.map(post => (
-                // Part 2c: onClick navigates to /post/{postId}
                 <div
                   key={post.id}
+                  onClick={() => navigate('/post/' + post.id)}
                   style={{
                     aspectRatio: '1 / 1',
                     backgroundImage: `url(${post.thumbnailUrl})`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
+                    cursor: 'pointer',
                   }}
                 />
               ))}

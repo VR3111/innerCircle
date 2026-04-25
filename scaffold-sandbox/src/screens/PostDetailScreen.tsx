@@ -1,16 +1,20 @@
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { AGENTS, AGENT_ORDER } from '@/lib/design-tokens';
-import { POSTS, fmtCompact } from '@/lib/mock-data';
-import type { Post, Reply } from '@/lib/types';
-import { AgentDot, LivePulse, Odometer, PlaceholderImg } from '@/components/primitives';
+import { AGENTS, AGENT_ORDER, TOKENS } from '@/lib/design-tokens';
+import {
+  getPostById, MOCK_USERS, CURRENT_USER, fmtCompact,
+  type MockPost,
+} from '@/lib/mock-data';
+import type { Reply } from '@/lib/types';
+import { AgentDot, Odometer } from '@/components/primitives';
 import { ErrorState, Skeleton } from '@/components/states';
 import { CommentsSection } from '@/components/CommentsSection';
 import { useAsync } from '@/lib/useAsync';
 
-async function loadPost(id: string): Promise<Post | null> {
-  return new Promise(r => setTimeout(() => r(POSTS.find(p => p.id === id) ?? null), 160));
+// FIX 2: load from ALL_POSTS registry (all user posts, all handles)
+async function loadPost(id: string): Promise<MockPost | null> {
+  return new Promise(r => setTimeout(() => r(getPostById(id) ?? null), 160));
 }
 
 function buildSeedThread(agentId: Exclude<Reply['agent'], undefined>): Reply[] {
@@ -43,21 +47,16 @@ function buildSeedThread(agentId: Exclude<Reply['agent'], undefined>): Reply[] {
 
 // ─── @mention autocomplete helpers ───────────────────────────────────────────
 
-// Detect an active @mention trigger: @ at start-of-string OR after whitespace,
-// with no space between @ and cursor (space = mention completed).
-// "email@test" does NOT trigger (@ not at start or after whitespace).
 function getMentionQuery(text: string): string | null {
   const m = text.match(/(?:^|\s)@(\w*)$/);
   return m ? m[1] : null;
 }
 
-// Replace the trailing @partial in draft with @Name + space.
 function applyMention(draft: string, name: string): string {
   const atIdx = draft.lastIndexOf('@');
   return atIdx === -1 ? draft : `${draft.slice(0, atIdx)}@${name} `;
 }
 
-// Real agents only — exclude the virtual ALL sentinel
 const MENTION_AGENTS = AGENT_ORDER
   .filter(id => id !== 'ALL')
   .map(id => AGENTS[id]);
@@ -77,7 +76,6 @@ export function PostDetailScreen() {
   const [replyTo, setReplyTo]     = useState<Reply | null>(null);
   const [thread, setThread]       = useState<Reply[]>([]);
 
-  // @mention autocomplete state
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionIdx, setMentionIdx]     = useState(0);
 
@@ -86,14 +84,14 @@ export function PostDetailScreen() {
   const commentsRef   = useRef<HTMLDivElement>(null);
   const threadSeeded  = useRef(false);
 
-  // ── Seed thread once when post loads ───────────────────────────────────────
+  // Seed thread once when post loads
   useEffect(() => {
     if (!post || threadSeeded.current) return;
     threadSeeded.current = true;
     setThread(buildSeedThread(post.agent));
   }, [post]);
 
-  // ── Scroll to comments when opened via feed-card comment button (Fix: from prev pass) ──
+  // Scroll to comments when opened via feed-card comment button
   useEffect(() => {
     if (!locationState?.scrollToComments || status !== 'ready') return;
     const t = setTimeout(() => {
@@ -102,17 +100,12 @@ export function PostDetailScreen() {
     return () => clearTimeout(t);
   }, [locationState?.scrollToComments, status]);
 
-  // ── Fix 4: visualViewport keyboard avoidance ────────────────────────────────
-  // When the software keyboard opens, the visual viewport shrinks. We push the
-  // composer up by setting its bottom offset to the gap between layout and visual
-  // viewports. Supported: Chrome 61+, Safari 13+, Firefox 91+. Older browsers
-  // skip gracefully via the `if (!vv)` guard. Capacitor iOS overrides this natively.
+  // visualViewport keyboard avoidance
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
     const onResize = () => {
       if (!composerRef.current) return;
-      // keyboard height = layout height − (visual viewport top + visual viewport height)
       const offset = Math.max(0, window.innerHeight - vv.offsetTop - vv.height);
       composerRef.current.style.bottom = `${offset}px`;
     };
@@ -127,19 +120,56 @@ export function PostDetailScreen() {
   if (status === 'loading') return <PostSkeleton onBack={() => navigate(-1)} />;
   if (status === 'error')
     return <div className="h-full bg-bg"><ErrorState message="Couldn't load post." onRetry={refetch} /></div>;
-  if (!post) return <div className="h-full bg-bg"><ErrorState message="Post not found." onRetry={() => navigate('/')} /></div>;
+
+  // FIX 2: POST NOT FOUND — matches same visual pattern as UserProfileScreen 404
+  if (!post) {
+    return (
+      <div style={{
+        position: 'absolute', inset: 0,
+        background: TOKENS.bg,
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        padding: '40px 20px',
+        fontFamily: 'Inter, system-ui, sans-serif',
+      }}>
+        <div style={{
+          fontFamily: 'ui-monospace, monospace', fontSize: 12, letterSpacing: 1.4, color: TOKENS.mute,
+        }}>
+          POST NOT FOUND
+        </div>
+        <div style={{ fontSize: 14, color: TOKENS.mute2, marginTop: 8, textAlign: 'center' }}>
+          /post/{id}
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          style={{
+            marginTop: 16, background: 'none', border: 'none',
+            color: TOKENS.mute2, cursor: 'pointer',
+            fontFamily: 'Inter, system-ui, sans-serif', fontSize: 14, textDecoration: 'underline',
+            padding: 0,
+          }}
+        >
+          Go back
+        </button>
+      </div>
+    );
+  }
 
   const A = AGENTS[post.agent];
   void error;
 
-  const totalComments = thread.reduce((n, c) => n + 1 + (c.replies?.length ?? 0), 0) || post.replies;
+  // FIX 3: look up real author — own posts redirect to /profile via Navigate guard
+  const authorUser = post.authorHandle === CURRENT_USER.handle
+    ? CURRENT_USER
+    : MOCK_USERS[post.authorHandle];
 
-  // Filtered mention suggestions for current query
+  const totalComments = thread.reduce((n, c) => n + 1 + (c.replies?.length ?? 0), 0) || post.comments;
+
   const mentionMatches = mentionQuery !== null
     ? MENTION_AGENTS.filter(a => a.name.toLowerCase().startsWith(mentionQuery.toLowerCase()))
     : [];
 
-  // ── Toggle like on any comment or nested reply ──────────────────────────────
   const toggleLike = (c: Reply) => {
     setThread(t => t.map(x => {
       if (x.id === c.id) return { ...x, liked: !x.liked, likes: x.likes + (x.liked ? -1 : 1) };
@@ -147,25 +177,19 @@ export function PostDetailScreen() {
     }));
   };
 
-  // ── Fix 2: Reply — prefill @mention, focus input, scroll comment into view ──
   const handleReply = (c: Reply) => {
     const name = c.agent ? AGENTS[c.agent].name : (c.name ?? '');
     setReplyTo(c);
     setDraft(`@${name} `);
-    setMentionQuery(null); // trailing space → getMentionQuery returns null anyway; explicit for clarity
+    setMentionQuery(null);
     setTimeout(() => {
-      // Scroll the parent comment into view so user can see context while typing
       document.getElementById(`comment-${c.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       inputRef.current?.focus();
     }, 50);
   };
 
-  // ── Send — draft is now the full text (mention already in draft if replying) ─
-  // Fix 2: removed the old `mention + draft.trim()` prepend; @mention is now
-  // prefilled into the input by handleReply so send() just uses draft as-is.
   const send = () => {
     if (!draft.trim()) return;
-    // Capture id before setThread so the setTimeout closure can look it up in the DOM
     const newId = 'n' + Date.now();
     const newComment: Reply = {
       id: newId, name: 'you',
@@ -182,33 +206,24 @@ export function PostDetailScreen() {
     setDraft('');
     setReplyTo(null);
     setMentionQuery(null);
-    // Fix 3: scroll new comment into view after React renders it.
-    // block:'center' keeps it visible above the sticky composer (Option A).
     setTimeout(() => {
       document.getElementById(`comment-${newId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 80);
   };
-
-  // ── Fix 3: @mention input handlers ─────────────────────────────────────────
 
   const handleDraftChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setDraft(val);
     const query = getMentionQuery(val);
     setMentionQuery(query);
-    // Reset highlight index whenever the query changes (new letter typed / deleted)
     if (query !== mentionQuery) setMentionIdx(0);
   };
 
   const selectMention = (name: string) => {
-    // Fix 1: strip the partial @query (about to be replaced) from draft,
-    // then check if @name is already present as a whole word (case-insensitive).
-    // @Blitz\b matches "@Blitz " but NOT "@Blitzkreig".
     const atIdx = draft.lastIndexOf('@');
     const prefix = atIdx === -1 ? draft : draft.slice(0, atIdx);
     const dupRe = new RegExp(`@${name}\\b`, 'i');
     if (dupRe.test(prefix)) {
-      // Already mentioned — close dropdown silently, no insertion
       setMentionQuery(null);
       setMentionIdx(0);
       inputRef.current?.focus();
@@ -222,7 +237,6 @@ export function PostDetailScreen() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // Dropdown navigation takes priority over Enter-to-send
     if (mentionQuery !== null && mentionMatches.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -245,13 +259,12 @@ export function PostDetailScreen() {
         return;
       }
     }
-    // Normal Enter sends comment
     if (e.key === 'Enter') send();
   };
 
   return (
     <div className="relative flex flex-col h-full bg-bg">
-      {/* top bar */}
+      {/* ── Top bar ─────────────────────────────────────────────────────────── */}
       <header
         className="relative z-10 flex items-center gap-2.5 border-b border-line bg-bg"
         style={{ padding: 'calc(14px + var(--ic-top-inset, 0px)) 20px 10px' }}
@@ -262,32 +275,58 @@ export function PostDetailScreen() {
             <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
+
+        {/* FIX 3: author identity — user initials + displayName + @handle, tap → /profile/:authorHandle */}
         <div className="flex items-center gap-2.5 flex-1 min-w-0">
-          <div role="button" tabIndex={0}
-               onClick={() => navigate(`/profile/${post.agent}`)}
-               style={{ display: 'inline-flex', cursor: 'pointer' }}>
-            <AgentDot agent={post.agent} size={32} clickable={false} />
+          <div
+            role="button" tabIndex={0}
+            onClick={() => navigate('/profile/' + post.authorHandle)}
+            style={{
+              width: 36, height: 36, borderRadius: '50%',
+              background: 'linear-gradient(135deg, #2a2a2a, #121212)',
+              border: `1px solid ${TOKENS.line2}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontFamily: 'Inter, system-ui, sans-serif',
+              fontSize: 13, fontWeight: 700, color: '#fff',
+              cursor: 'pointer', flexShrink: 0,
+            }}
+          >
+            {authorUser?.avatarInitials ?? post.authorHandle.slice(0, 2).toUpperCase()}
           </div>
-          <div className="leading-[1.15] min-w-0">
-            <div className="font-sans text-[14px] font-semibold text-white">{A.name}</div>
-            <div className="font-mono text-[9px] text-mute2 tracking-[0.14em] mt-0.5">{A.tag.toUpperCase()} · {post.time} AGO</div>
+          <div
+            className="leading-[1.15] min-w-0"
+            onClick={() => navigate('/profile/' + post.authorHandle)}
+            style={{ cursor: 'pointer' }}
+          >
+            <div className="font-sans text-[14px] font-semibold text-white">
+              {authorUser?.displayName ?? post.authorHandle}
+            </div>
+            <div className="font-mono text-[9px] text-mute2 tracking-[0.14em] mt-0.5">
+              @{post.authorHandle} · {A.tag.toUpperCase()} · {post.createdAt}
+            </div>
           </div>
         </div>
+
         <button onClick={() => setFollowing(f => !f)}
           className="rounded-pill px-3.5 py-1.5 font-sans text-[11px] font-semibold border transition-colors"
           style={{ background: following ? 'transparent' : A.color, color: following ? A.color : '#0A0A0A', borderColor: A.color }}
         >{following ? 'FOLLOWING' : 'FOLLOW'}</button>
       </header>
 
-      {/* Scrollable content */}
+      {/* ── Scrollable content ──────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto no-scrollbar px-5 pb-[140px]">
-        {/* hero */}
+
+        {/* Hero — uses agent-colored SVG thumbnail; no live badge for user posts */}
         <div className="relative rounded-card overflow-hidden border border-line mt-4">
-          <PlaceholderImg kind={post.img} agent={post.agent} height={280} />
+          <div style={{
+            width: '100%', height: 280,
+            backgroundImage: `url(${post.thumbnailUrl})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }} />
           <div className="absolute inset-0"
                style={{ background: 'linear-gradient(180deg, transparent 45%, rgba(0,0,0,0.85) 100%)' }} />
           <div className="absolute left-[18px] right-[18px] bottom-[18px]">
-            {post.live && <LivePulse color={A.color} className="mb-2.5" />}
             <h1 className="m-0 font-sans text-[22px] font-bold text-white leading-[1.18] tracking-[-0.5px]"
                 style={{ textWrap: 'pretty' }}>{post.headline}</h1>
           </div>
@@ -310,7 +349,6 @@ export function PostDetailScreen() {
             <Odometer value={post.likes + (liked ? 1 : 0)} format={fmtCompact} />
           </button>
 
-          {/* Fix 1: comment icon is now a <button> that focuses the composer input */}
           <button
             onClick={() => inputRef.current?.focus()}
             className="bg-transparent border-0 p-0 cursor-pointer flex items-center gap-1.5 font-sans text-[13px] font-medium text-white"
@@ -335,26 +373,29 @@ export function PostDetailScreen() {
           </button>
         </div>
 
-        {/* Comments section */}
+        {/* Comments section — FIX 4: onUserTap wires commenter names to profiles */}
         <div ref={commentsRef}>
-          <CommentsSection thread={thread} onLike={toggleLike} onReply={handleReply} />
+          <CommentsSection
+            thread={thread}
+            onLike={toggleLike}
+            onReply={handleReply}
+            onUserTap={(handle) => navigate('/profile/' + handle)}
+          />
         </div>
       </div>
 
-      {/* ── Composer — Fix 4: ref used for visualViewport keyboard avoidance ── */}
+      {/* ── Composer ────────────────────────────────────────────────────────── */}
       <div
         ref={composerRef}
         className="absolute bottom-0 left-0 right-0 z-20 border-t border-line bg-bg"
         style={{ padding: '10px 16px calc(18px + var(--ic-bot-inset, 0px))' }}
       >
-        {/* Fix 2: REPLYING TO chip — × clears both replyTo AND draft */}
         {replyTo && (
           <div className="flex items-center gap-2 px-3 py-1.5 mb-2 bg-white/[0.04] rounded-[8px] font-mono text-[10px] text-mute tracking-[0.05em]">
             <span>REPLYING TO</span>
             <span style={{ color: replyTo.agent ? AGENTS[replyTo.agent].color : '#fff' }}>
               @{replyTo.agent ? AGENTS[replyTo.agent].name : replyTo.name}
             </span>
-            {/* Fix 2: clear draft too so the prefilled @mention is removed */}
             <button
               onClick={() => { setReplyTo(null); setDraft(''); setMentionQuery(null); }}
               className="ml-auto bg-transparent border-0 text-mute2 cursor-pointer text-[14px] p-0"
@@ -362,15 +403,14 @@ export function PostDetailScreen() {
           </div>
         )}
 
-        {/* Fix 3: @mention autocomplete dropdown — floats above the input row */}
         {mentionQuery !== null && mentionMatches.length > 0 && (
           <div style={{
             position: 'absolute',
             bottom: '100%',
             left: 16, right: 16,
             marginBottom: 4,
-            background: '#121212',           // bg2 value
-            border: '1px solid rgba(255,255,255,0.10)',  // line2 value
+            background: '#121212',
+            border: '1px solid rgba(255,255,255,0.10)',
             borderRadius: 12,
             overflow: 'hidden',
             boxShadow: '0 -8px 32px rgba(0,0,0,0.5)',
@@ -378,7 +418,6 @@ export function PostDetailScreen() {
             {mentionMatches.map((agent, i) => (
               <button
                 key={agent.id}
-                // Fix 3: onPointerDown prevents input blur so onClick can fire
                 onPointerDown={(e) => e.preventDefault()}
                 onClick={() => selectMention(agent.name)}
                 style={{
@@ -399,7 +438,6 @@ export function PostDetailScreen() {
                     {agent.tag}
                   </div>
                 </div>
-                {/* Highlight the matching prefix in the agent name */}
                 {i === mentionIdx && (
                   <div style={{ marginLeft: 'auto', width: 6, height: 6, borderRadius: '50%', background: agent.color }} />
                 )}
@@ -408,7 +446,6 @@ export function PostDetailScreen() {
           </div>
         )}
 
-        {/* Input + POST button */}
         <div className="flex items-center gap-2.5 px-3.5 py-2.5 bg-bg2 border border-line2 rounded-pill">
           <div className="w-6 h-6 rounded-full shrink-0"
                style={{ background: 'radial-gradient(circle at 30% 30%, #888, #222)' }} />
@@ -417,7 +454,6 @@ export function PostDetailScreen() {
             value={draft}
             onChange={handleDraftChange}
             onKeyDown={handleKeyDown}
-            // Fix 3: close dropdown on blur with a delay so click-on-item fires first
             onBlur={() => setTimeout(() => setMentionQuery(null), 150)}
             placeholder={replyTo
               ? `Reply to ${replyTo.agent ? AGENTS[replyTo.agent].name : replyTo.name}…`
@@ -452,7 +488,7 @@ function PostSkeleton({ onBack }: { onBack: () => void }) {
             <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
-        <Skeleton className="w-8 h-8 rounded-full animate-sl-shimmer" />
+        <Skeleton className="w-9 h-9 rounded-full animate-sl-shimmer" />
         <div className="flex flex-col gap-1.5">
           <Skeleton className="h-3 w-20 animate-sl-shimmer" />
           <Skeleton className="h-2 w-14 animate-sl-shimmer" />

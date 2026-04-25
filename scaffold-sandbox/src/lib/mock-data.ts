@@ -72,12 +72,12 @@ export const NOTIFICATIONS: Notification[] = [
   {
     id: 'n3', kind: 'endorsement', agent: 'BARON', unread: true, time: '38m',
     text: 'Baron endorsed your take: "Yields break below 4.1% changes the calculus."',
-    link: '/post/p1',             // → the yield post that was endorsed
+    link: '/post/vinay-p001',      // → the yield post that was endorsed (CURRENT_USER Finance)
   },
   {
     id: 'n4', kind: 'reply', agent: 'CIRCUIT', unread: true, time: '1h',
     text: 'Circuit replied to your post in Tech.',
-    link: '/post/p2',             // → Circuit's AI post (Tech category)
+    link: '/post/vinay-p001',      // → CURRENT_USER's Tech post (Circuit replied)
   },
   // ── Read ──────────────────────────────────────────────────────────────────
   {
@@ -93,7 +93,7 @@ export const NOTIFICATIONS: Notification[] = [
   {
     id: 'n7', kind: 'post', agent: 'REEL', unread: false, time: '8h',
     text: 'Reel posted: "Premiere week — three films worth watching."',
-    link: '/post/p5',             // → the A24 Entertainment post
+    link: '/post/devon_w-p001',    // → devon_w's post (Reel posted, no specific user)
   },
   {
     id: 'n8', kind: 'level', agent: null, unread: false, time: '1d',
@@ -103,7 +103,7 @@ export const NOTIFICATIONS: Notification[] = [
   {
     id: 'n9', kind: 'reply', agent: 'BLITZ', unread: false, time: '1d',
     text: "Blitz replied to 12 Creators Club members — you weren't included.",
-    link: '/post/p4',             // → sports post (Blitz replied to p4 thread)
+    link: '/post/devon_w-p001',    // → devon_w's post (Blitz replied, no specific user)
   },
   {
     id: 'n10', kind: 'rank_change', agent: 'CIRCUIT', unread: false, time: '2d',
@@ -114,7 +114,7 @@ export const NOTIFICATIONS: Notification[] = [
   {
     id: 'n11', kind: 'reply', agent: 'BARON', unread: false, time: '3d',
     text: '@devon_w replied to your Finance thread.',
-    link: '/post/p1',
+    link: '/post/devon_w-p001',    // → devon_w's post (@devon_w replied)
     userHandle: 'devon_w',
   },
 ];
@@ -265,7 +265,7 @@ export type CreatorsClubStatus = {
 };
 
 export type ArenaBadge = {
-  agent: AgentId;
+  agent: Exclude<AgentId, 'ALL'>;
   categoryName: string;
   rank: number;
   total: number;
@@ -494,11 +494,13 @@ export type ProfilePost = {
 export type MockPost = {
   id: string;           // e.g. "devon_w-p001"
   authorHandle: string;
-  agent: AgentId;
+  agent: Exclude<AgentId, 'ALL'>;
   thumbnailUrl: string;
+  headline: string;     // short title shown in PostDetail hero
   caption: string;
   likes: number;
   comments: number;
+  shares: number;
   createdAt: string;    // e.g. "3d ago"
 };
 
@@ -530,7 +532,7 @@ export const ALL_POSTS: Record<string, MockPost> = (() => {
   const allUsers: UserProfile[] = [CURRENT_USER, ...Object.values(MOCK_USERS)];
 
   for (const user of allUsers) {
-    const agents: AgentId[] = user.arenaBadges.map(b => b.agent);
+    const agents: Exclude<AgentId, 'ALL'>[] = user.arenaBadges.map(b => b.agent);
     if (agents.length === 0) agents.push('BARON'); // fallback for badge-less users
 
     for (let i = 0; i < user.postCount; i++) {
@@ -541,9 +543,11 @@ export const ALL_POSTS: Record<string, MockPost> = (() => {
         authorHandle: user.handle,
         agent,
         thumbnailUrl: generatePostThumbnail(agent, i),
+        headline: `${AGENTS[agent].name} · Signal ${String(i + 1).padStart(3, '0')}`,
         caption: `Sample post ${i + 1} from @${user.handle} in ${AGENTS[agent].name}'s space.`,
         likes:    (seed(id) % 490) + 10,
         comments:  seed(id + 'c') % 50,
+        shares:   (seed(id + 's') % 150) + 5,
         createdAt: `${(i % 30) + 1}d ago`,
       };
     }

@@ -10,9 +10,11 @@ interface CommentsSectionProps {
   thread: Reply[];
   onLike: (c: Reply) => void;
   onReply: (c: Reply) => void;
+  // FIX 4: taps commenter name/avatar → /profile/:handle (wired from PostDetailScreen)
+  onUserTap?: (handle: string) => void;
 }
 
-export function CommentsSection({ thread, onLike, onReply }: CommentsSectionProps) {
+export function CommentsSection({ thread, onLike, onReply, onUserTap }: CommentsSectionProps) {
   const [tab, setTab] = useState<'everyone' | 'inner'>('everyone');
 
   // Inner Circle: top-level + replies that are agent comments or premium (prototype L338)
@@ -73,9 +75,9 @@ export function CommentsSection({ thread, onLike, onReply }: CommentsSectionProp
         <div>
           {thread.map(c => (
             <div key={c.id}>
-              <Comment c={c} onLike={onLike} onReply={onReply} />
+              <Comment c={c} onLike={onLike} onReply={onReply} onUserTap={onUserTap} />
               {c.replies?.map(r => (
-                <Comment key={r.id} c={r} onLike={onLike} onReply={onReply} indent />
+                <Comment key={r.id} c={r} onLike={onLike} onReply={onReply} onUserTap={onUserTap} indent />
               ))}
             </div>
           ))}
@@ -85,7 +87,7 @@ export function CommentsSection({ thread, onLike, onReply }: CommentsSectionProp
         <div>
           {innerCircle.length > 0
             ? innerCircle.map(c => (
-                <Comment key={c.id} c={c} onLike={onLike} onReply={onReply} />
+                <Comment key={c.id} c={c} onLike={onLike} onReply={onReply} onUserTap={onUserTap} />
               ))
             : (
               <div style={{

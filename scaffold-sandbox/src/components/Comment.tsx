@@ -4,6 +4,7 @@
 import { AGENTS, TOKENS } from '@/lib/design-tokens';
 import { AgentDot } from '@/components/primitives';
 import type { Reply } from '@/lib/types';
+import { MOCK_USERS, CURRENT_USER } from '@/lib/mock-data';
 
 // Split on @mention tokens; use agent color when the handle matches a real agent,
 // fall back to TOKENS.gold for user handles (e.g. @devon_w, @quantrose).
@@ -28,13 +29,20 @@ interface CommentProps {
   onReply?: (c: Reply) => void;
   onLike?: (c: Reply) => void;
   indent?: boolean;
+  // FIX 4: passed from PostDetailScreen via CommentsSection; navigate to profile on tap
+  onUserTap?: (handle: string) => void;
 }
 
-export function Comment({ c, onReply, onLike, indent = false }: CommentProps) {
+export function Comment({ c, onReply, onLike, indent = false, onUserTap }: CommentProps) {
   const A = c.agent ? AGENTS[c.agent] : null;
   const displayName = A ? A.name : (c.name ?? 'anon');
   const nameColor   = A ? A.color : '#FFFFFF';
   const avatarSize  = indent ? 28 : 34;  // prototype L38
+
+  // True when the commenter handle is a key in MOCK_USERS or is the current user
+  const isKnownUser = !A && c.name != null && (
+    c.name === CURRENT_USER.handle || Boolean(MOCK_USERS[c.name])
+  );
 
   return (
     <div
@@ -57,21 +65,25 @@ export function Comment({ c, onReply, onLike, indent = false }: CommentProps) {
       )}
 
       {/* Avatar — AgentDot when agent reply, gradient initial when user (prototype L37-48) */}
+      {/* FIX 4: known-user avatars are tappable → /profile/:handle                      */}
       {A ? (
         <div style={{ flexShrink: 0 }}>
           <AgentDot agent={c.agent!} size={avatarSize} clickable={false} />
         </div>
       ) : (
-        <div style={{
-          width: avatarSize, height: avatarSize,
-          borderRadius: '50%', flexShrink: 0,
-          background: 'radial-gradient(circle at 32% 28%, #7a7a82 0%, #3c3c42 60%, #1c1c20 100%)',
-          boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.15), inset 0 -4px 8px rgba(0,0,0,0.4)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          // font override: Geist → Inter
-          fontFamily: 'Inter, system-ui, sans-serif',
-          fontSize: 12, color: '#fff', fontWeight: 600,
-        }}>
+        <div
+          onClick={isKnownUser && onUserTap ? () => onUserTap(c.name!) : undefined}
+          style={{
+            width: avatarSize, height: avatarSize,
+            borderRadius: '50%', flexShrink: 0,
+            background: 'radial-gradient(circle at 32% 28%, #7a7a82 0%, #3c3c42 60%, #1c1c20 100%)',
+            boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.15), inset 0 -4px 8px rgba(0,0,0,0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: 'Inter, system-ui, sans-serif',
+            fontSize: 12, color: '#fff', fontWeight: 600,
+            cursor: isKnownUser && onUserTap ? 'pointer' : 'default',
+          }}
+        >
           {String(c.name || '?')[0].toUpperCase()}
         </div>
       )}
@@ -81,12 +93,16 @@ export function Comment({ c, onReply, onLike, indent = false }: CommentProps) {
 
         {/* Name + badges + timestamp row (prototype L51-76) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{
-            // font override: Geist → Inter
-            fontFamily: 'Inter, system-ui, sans-serif',
-            fontSize: 13, fontWeight: 600,
-            color: nameColor, letterSpacing: -0.1,
-          }}>{displayName}</span>
+          {/* FIX 4: known-user name is tappable → /profile/:handle */}
+          <span
+            onClick={isKnownUser && onUserTap ? () => onUserTap(c.name!) : undefined}
+            style={{
+              fontFamily: 'Inter, system-ui, sans-serif',
+              fontSize: 13, fontWeight: 600,
+              color: nameColor, letterSpacing: -0.1,
+              cursor: isKnownUser && onUserTap ? 'pointer' : 'default',
+            }}
+          >{displayName}</span>
 
           {/* AGENT badge — only shown when comment is from an agent */}
           {A && (
