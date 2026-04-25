@@ -3,67 +3,93 @@ export type Database = {
     Tables: {
       profiles: {
         Row: {
-          id: string               // uuid
-          username: string
-          avatar_url: string | null
-          rank: number
-          following_count: number
-          circles_count: number
-          created_at: string       // timestamp
+          id:                   string        // uuid
+          username:             string
+          avatar_url:           string | null
+          rank:                 number
+          following_count:      number        // legacy always-zero column, do not use
+          circles_count:        number
+          created_at:           string        // timestamp
+          // Added migration 012:
+          display_name:          string | null
+          bio:                   string | null
+          is_inner_circle:       boolean
+          signal_score:          number
+          posts_count:           number
+          followers_count:       number
+          user_following_count:  number
+          // Future — added in Step 6 (Leaderboard / Creators Club):
+          creators_club_category: string | null
         }
         Insert: {
-          id: string
-          username: string
-          avatar_url?: string | null
-          rank?: number
-          following_count?: number
-          circles_count?: number
-          created_at?: string
+          id:                    string
+          username:              string
+          avatar_url?:           string | null
+          rank?:                 number
+          following_count?:      number
+          circles_count?:        number
+          created_at?:           string
+          display_name?:           string | null
+          bio?:                    string | null
+          is_inner_circle?:        boolean
+          signal_score?:           number
+          posts_count?:            number
+          followers_count?:        number
+          user_following_count?:   number
+          creators_club_category?: string | null
         }
         Update: {
-          id?: string
-          username?: string
-          avatar_url?: string | null
-          rank?: number
-          following_count?: number
-          circles_count?: number
-          created_at?: string
+          id?:                     string
+          username?:               string
+          avatar_url?:             string | null
+          rank?:                   number
+          following_count?:        number
+          circles_count?:          number
+          created_at?:             string
+          display_name?:           string | null
+          bio?:                    string | null
+          is_inner_circle?:        boolean
+          signal_score?:           number
+          posts_count?:            number
+          followers_count?:        number
+          user_following_count?:   number
+          creators_club_category?: string | null
         }
         Relationships: []
       }
 
       agents: {
         Row: {
-          id: string               // text (e.g. "baron", "blitz")
-          name: string
-          category: string
-          color: string
-          tagline: string
-          followers: number
+          id:          string               // text (e.g. "baron", "blitz")
+          name:        string
+          category:    string
+          color:       string
+          tagline:     string
+          followers:   number
           posts_count: number
-          rank: number
+          rank:        number
           is_official: boolean
         }
         Insert: {
-          id: string
-          name: string
-          category: string
-          color: string
-          tagline: string
-          followers?: number
+          id:           string
+          name:         string
+          category:     string
+          color:        string
+          tagline:      string
+          followers?:   number
           posts_count?: number
-          rank?: number
+          rank?:        number
           is_official?: boolean
         }
         Update: {
-          id?: string
-          name?: string
-          category?: string
-          color?: string
-          tagline?: string
-          followers?: number
+          id?:          string
+          name?:        string
+          category?:    string
+          color?:       string
+          tagline?:     string
+          followers?:   number
           posts_count?: number
-          rank?: number
+          rank?:        number
           is_official?: boolean
         }
         Relationships: []
@@ -71,37 +97,41 @@ export type Database = {
 
       posts: {
         Row: {
-          id: string               // uuid
-          agent_id: string         // → agents.id
-          headline: string
-          body: string
-          image_url: string | null
-          likes: number
-          comments: number
-          shares: number
+          id:         string               // uuid
+          agent_id:   string               // → agents.id (category tag)
+          headline:   string
+          body:       string
+          image_url:  string | null
+          likes:      number
+          comments:   number
+          shares:     number
           created_at: string
+          // Added migration 012:
+          user_id:    string | null        // NULL = agent post; NOT NULL = user post
         }
         Insert: {
-          id?: string
-          agent_id: string
-          headline: string
-          body: string
+          id?:        string
+          agent_id:   string
+          headline:   string
+          body:       string
           image_url?: string | null
-          likes?: number
-          comments?: number
-          shares?: number
+          likes?:     number
+          comments?:  number
+          shares?:    number
           created_at?: string
+          user_id?:   string | null
         }
         Update: {
-          id?: string
-          agent_id?: string
-          headline?: string
-          body?: string
+          id?:        string
+          agent_id?:  string
+          headline?:  string
+          body?:      string
           image_url?: string | null
-          likes?: number
-          comments?: number
-          shares?: number
+          likes?:     number
+          comments?:  number
+          shares?:    number
           created_at?: string
+          user_id?:   string | null
         }
         Relationships: [
           {
@@ -110,27 +140,34 @@ export type Database = {
             isOneToOne: false
             referencedRelation: 'agents'
             referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'posts_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
           }
         ]
       }
 
       follows: {
         Row: {
-          id: string               // uuid
-          user_id: string          // → profiles.id
-          agent_id: string         // → agents.id
+          id:         string               // uuid
+          user_id:    string               // → profiles.id
+          agent_id:   string               // → agents.id
           created_at: string
         }
         Insert: {
-          id?: string
-          user_id: string
-          agent_id: string
+          id?:        string
+          user_id:    string
+          agent_id:   string
           created_at?: string
         }
         Update: {
-          id?: string
-          user_id?: string
-          agent_id?: string
+          id?:        string
+          user_id?:   string
+          agent_id?:  string
           created_at?: string
         }
         Relationships: [
@@ -151,23 +188,62 @@ export type Database = {
         ]
       }
 
-      inner_circle: {
+      // Added migration 012: user→user follow graph.
+      // Separate from follows (user→agent).
+      user_follows: {
         Row: {
-          id: string               // uuid
-          user_id: string          // → profiles.id
-          agent_id: string         // → agents.id
-          created_at: string
+          id:          string               // uuid
+          follower_id: string               // → profiles.id
+          followed_id: string               // → profiles.id
+          created_at:  string
         }
         Insert: {
-          id?: string
-          user_id: string
-          agent_id: string
+          id?:         string
+          follower_id: string
+          followed_id: string
           created_at?: string
         }
         Update: {
-          id?: string
-          user_id?: string
-          agent_id?: string
+          id?:          string
+          follower_id?: string
+          followed_id?: string
+          created_at?:  string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'user_follows_follower_id_fkey'
+            columns: ['follower_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'user_follows_followed_id_fkey'
+            columns: ['followed_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          }
+        ]
+      }
+
+      inner_circle: {
+        Row: {
+          id:         string               // uuid
+          user_id:    string               // → profiles.id
+          agent_id:   string               // → agents.id
+          created_at: string
+        }
+        Insert: {
+          id?:        string
+          user_id:    string
+          agent_id:   string
+          created_at?: string
+        }
+        Update: {
+          id?:        string
+          user_id?:   string
+          agent_id?:  string
           created_at?: string
         }
         Relationships: [
@@ -190,37 +266,37 @@ export type Database = {
 
       replies: {
         Row: {
-          id: string               // uuid
-          post_id: string          // → posts.id
-          user_id: string          // → profiles.id
-          content: string
+          id:              string               // uuid
+          post_id:         string               // → posts.id
+          user_id:         string               // → profiles.id
+          content:         string
           is_inner_circle: boolean
-          is_agent_reply: boolean
-          is_pinned: boolean       // added migration 009
-          parent_reply_id: string | null  // added migration 009
-          created_at: string
+          is_agent_reply:  boolean
+          is_pinned:       boolean              // added migration 009
+          parent_reply_id: string | null        // added migration 009
+          created_at:      string
         }
         Insert: {
-          id?: string
-          post_id: string
-          user_id: string
-          content: string
+          id?:              string
+          post_id:          string
+          user_id:          string
+          content:          string
           is_inner_circle?: boolean
-          is_agent_reply?: boolean
-          is_pinned?: boolean
+          is_agent_reply?:  boolean
+          is_pinned?:       boolean
           parent_reply_id?: string | null
-          created_at?: string
+          created_at?:      string
         }
         Update: {
-          id?: string
-          post_id?: string
-          user_id?: string
-          content?: string
+          id?:              string
+          post_id?:         string
+          user_id?:         string
+          content?:         string
           is_inner_circle?: boolean
-          is_agent_reply?: boolean
-          is_pinned?: boolean
+          is_agent_reply?:  boolean
+          is_pinned?:       boolean
           parent_reply_id?: string | null
-          created_at?: string
+          created_at?:      string
         }
         Relationships: [
           {
@@ -242,21 +318,21 @@ export type Database = {
 
       post_likes: {
         Row: {
-          id: string               // uuid
-          post_id: string          // → posts.id
-          user_id: string          // → profiles.id
+          id:         string               // uuid
+          post_id:    string               // → posts.id
+          user_id:    string               // → profiles.id
           created_at: string
         }
         Insert: {
-          id?: string
-          post_id: string
-          user_id: string
+          id?:        string
+          post_id:    string
+          user_id:    string
           created_at?: string
         }
         Update: {
-          id?: string
-          post_id?: string
-          user_id?: string
+          id?:        string
+          post_id?:   string
+          user_id?:   string
           created_at?: string
         }
         Relationships: [
@@ -301,30 +377,30 @@ export type Database = {
 
       notifications: {
         Row: {
-          id: string               // uuid
-          user_id: string          // → profiles.id
-          type: string
-          title: string
-          body: string
-          is_read: boolean
+          id:         string               // uuid
+          user_id:    string               // → profiles.id
+          type:       string
+          title:      string
+          body:       string
+          is_read:    boolean
           created_at: string
         }
         Insert: {
-          id?: string
-          user_id: string
-          type: string
-          title: string
-          body: string
-          is_read?: boolean
+          id?:        string
+          user_id:    string
+          type:       string
+          title:      string
+          body:       string
+          is_read?:   boolean
           created_at?: string
         }
         Update: {
-          id?: string
-          user_id?: string
-          type?: string
-          title?: string
-          body?: string
-          is_read?: boolean
+          id?:        string
+          user_id?:   string
+          type?:      string
+          title?:     string
+          body?:      string
+          is_read?:   boolean
           created_at?: string
         }
         Relationships: [
@@ -360,6 +436,23 @@ export type Database = {
       }
       increment_daily_spend: {
         Args: { p_date: string; p_cents: number }
+        Returns: undefined
+      }
+      // Added migration 012:
+      recompute_signal_score: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
+      adjust_user_followers: {
+        Args: { p_followed_id: string; p_delta: number }
+        Returns: undefined
+      }
+      adjust_user_following: {
+        Args: { p_follower_id: string; p_delta: number }
+        Returns: undefined
+      }
+      adjust_user_posts_count: {
+        Args: { p_user_id: string; p_delta: number }
         Returns: undefined
       }
     }
