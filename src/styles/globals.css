@@ -1,0 +1,180 @@
+@import "tailwindcss";
+
+/* ── Design tokens (ported from scaffold-sandbox/tailwind.config.ts) ─── */
+@theme {
+  /* Colors */
+  --color-bg:    #070707;
+  --color-bg1:   #0D0D0D;
+  --color-bg2:   #121212;
+  --color-bg3:   #1A1A1A;
+  --color-line:  rgba(255, 255, 255, 0.06);
+  --color-line2: rgba(255, 255, 255, 0.10);
+  --color-mute:  rgba(255, 255, 255, 0.56);
+  --color-mute2: rgba(255, 255, 255, 0.38);
+  --color-mute3: rgba(255, 255, 255, 0.22);
+  --color-gold:  #D4AF37;
+  --color-down:  #FF5A5F;
+  --color-agent-baron:   #E63946;
+  --color-agent-blitz:   #F4A261;
+  --color-agent-circuit: #457B9D;
+  --color-agent-reel:    #E9C46A;
+  --color-agent-pulse:   #2A9D8F;
+  --color-agent-atlas:   #6C757D;
+
+  /* Font families */
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: ui-monospace, monospace;
+
+  /* Border radius */
+  --radius-card: 16px;
+  --radius-pill: 9999px;
+
+  /* Box shadows */
+  --shadow-card: 0 40px 80px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.4);
+
+  /* Animations (keyframes defined below) */
+  --animate-sl-pulse:   sl-pulse 1.8s ease-out infinite;
+  --animate-sl-shimmer: sl-shimmer 1.6s linear infinite;
+}
+
+:root {
+  color-scheme: dark;
+  --bg: #070707;
+  --bg-1: #0D0D0D;
+  --bg-2: #121212;
+  --bg-3: #1A1A1A;
+  --line: rgba(255,255,255,0.06);
+  --line-2: rgba(255,255,255,0.10);
+  --text: #FFFFFF;
+  --mute: rgba(255,255,255,0.56);
+  --mute-2: rgba(255,255,255,0.38);
+  --mute-3: rgba(255,255,255,0.22);
+  --gold: #D4AF37;
+
+  --agent-baron:   #E63946;
+  --agent-blitz:   #F4A261;
+  --agent-circuit: #457B9D;
+  --agent-reel:    #E9C46A;
+  --agent-pulse:   #2A9D8F;
+  --agent-atlas:   #6C757D;
+
+  --ic-top-inset: env(safe-area-inset-top, 0px);
+  --ic-bot-inset: env(safe-area-inset-bottom, 0px);
+
+  --header-logo-height: 3rem;
+  --dots-row-height: 4rem;
+  --bottom-nav-height: 4rem;
+  --bottom-nav-total: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom));
+}
+
+html, body, #root { height: 100%; margin: 0; padding: 0; background: var(--bg); }
+html, body { overscroll-behavior: none; }
+* { box-sizing: border-box; }
+
+/* ── Safe-area utilities ─────────────────────────────────────── */
+@layer utilities {
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .pt-safe { padding-top:    env(safe-area-inset-top, 0px); }
+  .mb-safe { margin-bottom:  env(safe-area-inset-bottom, 0px); }
+  .mt-safe { margin-top:     env(safe-area-inset-top, 0px); }
+}
+
+/* hide scrollbar but keep scroll */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+
+/* shimmer base */
+.sl-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.03) 0%,
+    rgba(255,255,255,0.08) 40%,
+    rgba(255,255,255,0.03) 80%
+  );
+  background-size: 400px 100%;
+}
+
+/* ─── Animation keyframes (ported from prototype-source/Social Leveling.html) ─ */
+
+@keyframes sl-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/*
+  Note: the @theme block above defines `animate-sl-shimmer` for background-
+  position shimmer (used by skeleton loaders). The SVG shimmer sweep in SLMark
+  uses `sl-shimmer-sweep` to avoid collision.
+*/
+@keyframes sl-shimmer-sweep {
+  0%   { transform: translateX(-30px) rotate(18deg); }
+  60%  { transform: translateX(260px) rotate(18deg); }
+  100% { transform: translateX(260px) rotate(18deg); }
+}
+
+@keyframes ic-glow {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50%      { opacity: 1;    transform: scale(1.06); }
+}
+
+/*
+  ic-float assumes the element is placed at top:50%; left:50% so that
+  translate(-50%,-50%) centers it before the vertical float offset is applied.
+*/
+@keyframes ic-float {
+  0%, 100% { transform: translate(-50%, -50%) translateY(0); }
+  50%      { transform: translate(-50%, -50%) translateY(-16px); }
+}
+
+@keyframes sl-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sl-loader {
+  0%   { transform: translateX(-120%); }
+  100% { transform: translateX(380%); }
+}
+
+/*
+  ic-float-corner: simple vertical bob for absolute-positioned corner orbs.
+  Unlike ic-float, this does NOT include translate(-50%,-50%) so it can be
+  applied to elements that are already placed via top/right/bottom/left.
+*/
+@keyframes ic-float-corner {
+  0%, 100% { transform: translateY(0px); }
+  50%      { transform: translateY(-12px); }
+}
+
+@keyframes ic-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.5; transform: scale(1.3); }
+}
+
+@keyframes sl-typing {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30%           { opacity: 1;   transform: translateY(-4px); }
+}
+
+@keyframes sl-msg-highlight {
+  0%   { background-color: rgba(212,175,55,0.18); }
+  100% { background-color: transparent; }
+}
+
+@keyframes sl-swipe-back {
+  from { transform: var(--swipe-from); }
+  to   { transform: translateX(0); }
+}
+
+/* ── Keyframes from scaffold tailwind.config.ts (not in prototype HTML) ── */
+
+@keyframes sl-pulse {
+  0%   { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+  70%  { box-shadow: 0 0 0 8px rgba(0, 0, 0, 0); opacity: 0.6; }
+  100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); opacity: 1; }
+}
+
+@keyframes sl-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
