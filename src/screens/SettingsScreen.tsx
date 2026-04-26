@@ -6,6 +6,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { TOKENS } from '@/lib/design-tokens';
 import { SLMark } from '@/components/Logo';
+import { useAuth } from '../contexts/AuthContext';
+import { useProfile } from '../hooks/useProfile';
+import { Skeleton } from '@/components/states';
 
 // ── Helper: icon button style (back / placeholder spacer) ─────────────────────
 const iconBtnStyle: React.CSSProperties = {
@@ -132,19 +135,24 @@ function Toggle({ label, on, onChange, last }: ToggleProps) {
 // ── SettingsScreen ────────────────────────────────────────────────────────────
 export function SettingsScreen() {
   const navigate = useNavigate();
+  const { user, signOut } = useAuth();
+  const { profile, loading: profileLoading } = useProfile(user?.id ?? '');
   const [dark,    setDark]    = useState(true);
   const [haptics, setHaptics] = useState(true);
   const [notifs,  setNotifs]  = useState(true);
 
-  // TODO: wire to real user/auth state when available.
-  // When premium = true, profile badge shows, the "Join Inner Circle" CTA is
-  // hidden, and SUBSCRIPTION shows Plan / Renews / Cancel rows instead of the
-  // FREE TRIAL row below.
-  const premium = false;
+  const premium = profile?.is_inner_circle ?? false;
 
-  const handleSignOut = () => {
-    localStorage.clear();
-    navigate('/', { replace: true });
+  const displayName = profile?.display_name ?? profile?.username ?? user?.user_metadata?.username ?? '?';
+  const username    = profile?.username ?? user?.user_metadata?.username ?? '?';
+  const email       = user?.email ?? '—';
+  const avatarUrl   = profile?.avatar_url ?? null;
+  const initial     = (displayName)[0]?.toUpperCase() ?? '?';
+  const signalScore = profile?.signal_score ?? 0;
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth', { replace: true });
   };
 
   return (
@@ -175,47 +183,65 @@ export function SettingsScreen() {
         style={{ flex: 1, overflowY: 'auto', padding: '14px 18px 40px' }}
       >
         {/* Profile summary card */}
-        <div style={{
-          display: 'flex', gap: 14, alignItems: 'center',
-          padding: '16px', borderRadius: 14, marginBottom: 18,
-          background: 'rgba(255,255,255,0.02)', border: `1px solid ${TOKENS.line}`,
-        }}>
-          {/* Avatar circle */}
+        {profileLoading ? (
           <div style={{
-            width: 52, height: 52, borderRadius: '50%',
-            background: 'linear-gradient(135deg, #2a2a2a, #121212)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontFamily: 'Inter, system-ui, sans-serif', fontSize: 20, fontWeight: 700, color: TOKENS.text,
-            border: premium ? `2px solid ${TOKENS.gold}` : `1px solid ${TOKENS.line2}`,
-            boxShadow: premium ? `0 0 16px ${TOKENS.gold}55` : 'none',
-          }}>T</div>
-
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{
-                fontFamily: 'Inter, system-ui, sans-serif', fontSize: 15, fontWeight: 600, color: TOKENS.text,
-              }}>taylor.alpha</span>
-
-              {/* Inner Circle badge — dead code until premium wires in */}
-              {premium && (
-                <span style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  padding: '2px 7px', borderRadius: 999,
-                  background: 'linear-gradient(135deg, #F4D47C 0%, #D4AF37 100%)',
-                  fontFamily: 'ui-monospace, monospace', fontSize: 8.5,
-                  color: '#0A0A0A', letterSpacing: 1,
-                }}>
-                  <SLMark size={8} color="#0A0A0A" /> INNER CIRCLE
-                </span>
-              )}
+            display: 'flex', gap: 14, alignItems: 'center',
+            padding: '16px', borderRadius: 14, marginBottom: 18,
+            background: 'rgba(255,255,255,0.02)', border: `1px solid ${TOKENS.line}`,
+          }}>
+            <Skeleton className="w-[52px] h-[52px] rounded-full" />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-3 w-20" />
+            </div>
+          </div>
+        ) : (
+          <div style={{
+            display: 'flex', gap: 14, alignItems: 'center',
+            padding: '16px', borderRadius: 14, marginBottom: 18,
+            background: 'rgba(255,255,255,0.02)', border: `1px solid ${TOKENS.line}`,
+          }}>
+            {/* Avatar circle */}
+            <div style={{
+              width: 52, height: 52, borderRadius: '50%',
+              background: 'linear-gradient(135deg, #2a2a2a, #121212)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontFamily: 'Inter, system-ui, sans-serif', fontSize: 20, fontWeight: 700, color: TOKENS.text,
+              border: premium ? `2px solid ${TOKENS.gold}` : `1px solid ${TOKENS.line2}`,
+              boxShadow: premium ? `0 0 16px ${TOKENS.gold}55` : 'none',
+              overflow: 'hidden',
+            }}>
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="" style={{ width: 52, height: 52, objectFit: 'cover' }} />
+              ) : initial}
             </div>
 
-            <div style={{
-              fontFamily: 'ui-monospace, monospace', fontSize: 10,
-              color: TOKENS.mute2, letterSpacing: 1.2, marginTop: 3,
-            }}>LEVEL 07 · SIGNAL</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{
+                  fontFamily: 'Inter, system-ui, sans-serif', fontSize: 15, fontWeight: 600, color: TOKENS.text,
+                }}>{username}</span>
+
+                {premium && (
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '2px 7px', borderRadius: 999,
+                    background: 'linear-gradient(135deg, #F4D47C 0%, #D4AF37 100%)',
+                    fontFamily: 'ui-monospace, monospace', fontSize: 8.5,
+                    color: '#0A0A0A', letterSpacing: 1,
+                  }}>
+                    <SLMark size={8} color="#0A0A0A" /> INNER CIRCLE
+                  </span>
+                )}
+              </div>
+
+              <div style={{
+                fontFamily: 'ui-monospace, monospace', fontSize: 10,
+                color: TOKENS.mute2, letterSpacing: 1.2, marginTop: 3,
+              }}>{signalScore.toLocaleString()} SIGNAL</div>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* "Join Inner Circle" CTA — hidden when premium = true */}
         {!premium && (
@@ -245,10 +271,10 @@ export function SettingsScreen() {
 
         {/* ── ACCOUNT ──────────────────────────────────────────────────────── */}
         <SettingsGroup title="ACCOUNT">
-          <Row label="Email"        value="taylor@alpha.co" chevron />
-          <Row label="Username"     value="@taylor.alpha"   chevron />
-          <Row label="Display name" value="Taylor A."       chevron />
-          <Row label="Level"        value="07 · SIGNAL"     chevron last />
+          <Row label="Email"        value={email}                                     chevron />
+          <Row label="Username"     value={`@${username}`}                            chevron />
+          <Row label="Display name" value={displayName}                               chevron />
+          <Row label="Signal score" value={`${signalScore.toLocaleString()} · SIGNAL`} chevron last />
         </SettingsGroup>
 
         {/* ── SUBSCRIPTION ─────────────────────────────────────────────────── */}

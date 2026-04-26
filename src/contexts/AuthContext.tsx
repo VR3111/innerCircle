@@ -3,6 +3,9 @@ import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { ensureProfile } from '../lib/profiles'
 
+const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL      as string
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+
 interface AuthContextType {
   user: User | null
   session: Session | null
@@ -106,30 +109,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /**
    * Sign out with no race condition.
    *
-   * The bug with calling supabase.auth.signOut() and then immediately calling
-   * navigate("/auth") is that onAuthStateChange fires asynchronously AFTER the
-   * network round-trip. If navigate fires first, Auth.tsx mounts while session
-   * is still truthy → its useEffect redirects the user back to /home.
-   *
-   * Fix: null out session/user in React state RIGHT NOW (synchronous), THEN do
-   * the network call. By the time navigate("/auth") fires and Auth.tsx mounts,
-   * the context already has session = null so Auth.tsx won't redirect anywhere.
+   * 1. Capture the access token before clearing state.
+   * 2. Null out React state synchronously so any component that reads session
+   *    sees null before the next render cycle.
+   * 3. Clear localStorage keys and dispatch a StorageEvent so any other
+   *    listeners (including other tabs) see the sign-out.
+   * 4. Fire-and-forget: revoke the server-side token via raw fetch.
+   *    No SDK calls — avoids the PKCE _useSession → _acquireLock deadlock path.
    */
   const doSignOut = async () => {
-    // 1. Wipe local React state synchronously so any mounted component that
-    //    reads session sees null before the next render cycle.
+    const token = session?.access_token
+
+    // 1. Wipe React state synchronously
     setSession(null)
     setUser(null)
 
-    // 2. Clear the onboarding flag so a future sign-up goes through onboarding.
+    // 2. Clear localStorage
     localStorage.removeItem('onboarded')
+    localStorage.removeItem('inner-circle-auth')
 
-    // 3. Tell Supabase to invalidate the server-side token.
-    try {
-      await supabase.auth.signOut()
-    } catch (_err) {
-      // Network failure or already-expired token. Local state is already
-      // cleared so the user is effectively signed out on this client.
+    // 3. Notify StorageEvent listeners (other tabs, AuthContext listener)
+    window.dispatchEvent(
+      new StorageEvent('storage', {
+        key: 'inner-circle-auth',
+        newValue: null,
+        storageArea: localStorage,
+      }),
+    )
+
+    // 4. Fire-and-forget: revoke server-side refresh token
+    if (token) {
+      void fetch(`${SUPABASE_URL}/auth/v1/logout`, {
+        method: 'POST',
+        headers: {
+          apikey:        SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${token}`,
+        },
+      })
     }
   }
 
