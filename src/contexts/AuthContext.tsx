@@ -40,7 +40,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth
       .getSession()
       .then(({ data: { session } }) => {
-        setSession(session)
+        setSession(prev => {
+          const next = session ?? null
+          return prev?.access_token === next?.access_token ? prev : next
+        })
         // Functional update: return the previous object if the id is unchanged,
         // preventing a subtree re-render when the value is semantically the same.
         setUser(prev => {
@@ -59,7 +62,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setSession(session)
+      setSession(prev => {
+        const next = session ?? null
+        return prev?.access_token === next?.access_token ? prev : next
+      })
       setUser(prev => {
         const next = session?.user ?? null
         return prev?.id === next?.id ? prev : next
