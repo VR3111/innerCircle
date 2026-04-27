@@ -26,24 +26,28 @@ import { PaywallScreen } from './screens/PaywallScreen'
 
 // ── RequireAuth ─────────────────────────────────────────────
 // Redirects to /auth when there is no session; shows nothing while loading.
-// When the destination is "/" (splash/onboarding), returning users go to /home.
+// Universal onboarding gate: any authenticated route redirects to /onboarding
+// unless the user has already completed it (localStorage onboarded === 'true').
 function RequireAuth() {
-  const { session, loading, user } = useAuth()
+  const { session, loading } = useAuth()
   const location = useLocation()
 
   if (loading) return null
   if (!session) return <Navigate to="/auth" replace />
 
-  if (location.pathname === '/') {
-    const onboarded = localStorage.getItem('onboarded')
-    if (onboarded === 'true') {
-      return <Navigate to="/home" replace />
-    }
-    if (onboarded !== 'false') {
-      const createdAt = user?.created_at ? new Date(user.created_at).getTime() : 0
-      const isReturningUser = Date.now() - createdAt > 60_000
-      if (isReturningUser) return <Navigate to="/home" replace />
-    }
+  // Onboarding gate — applies to every authenticated route except /onboarding
+  // itself (to avoid infinite redirect) and / (splash handles its own routing).
+  if (
+    location.pathname !== '/onboarding' &&
+    location.pathname !== '/' &&
+    localStorage.getItem('onboarded') !== 'true'
+  ) {
+    return <Navigate to="/onboarding" replace />
+  }
+
+  // Splash: if already onboarded, skip straight to /home.
+  if (location.pathname === '/' && localStorage.getItem('onboarded') === 'true') {
+    return <Navigate to="/home" replace />
   }
 
   return <Outlet />
