@@ -346,7 +346,7 @@ export function PostDetailScreen() {
       {/* ── Top bar ─────────────────────────────────────────────────────────── */}
       <header
         className="relative z-10 flex items-center gap-2.5 border-b border-line bg-bg"
-        style={{ padding: 'calc(14px + var(--ic-top-inset, 0px)) 20px 10px' }}
+        style={{ padding: 'calc(4px + var(--ic-top-inset, 0px)) 20px 10px' }}
       >
         <button onClick={() => navigate(-1)}
           className="w-9 h-9 rounded-pill border border-line bg-white/[0.05] flex items-center justify-center text-white">
@@ -516,7 +516,7 @@ export function PostDetailScreen() {
       <div
         ref={composerRef}
         className="absolute bottom-0 left-0 right-0 z-20 border-t border-line bg-bg"
-        style={{ padding: '10px 16px calc(18px + var(--ic-bot-inset, 0px))' }}
+        style={{ padding: '10px 16px calc(6px + var(--ic-bot-inset, 0px))' }}
       >
         {replyTo && (
           <div className="flex items-center gap-2 px-3 py-1.5 mb-2 bg-white/[0.04] rounded-[8px] font-mono text-[10px] text-mute tracking-[0.05em]">
@@ -609,7 +609,7 @@ function PostSkeleton({ onBack }: { onBack: () => void }) {
   return (
     <div className="flex flex-col h-full bg-bg">
       <header className="flex items-center gap-2.5 border-b border-line"
-        style={{ padding: 'calc(14px + var(--ic-top-inset, 0px)) 20px 10px' }}>
+        style={{ padding: 'calc(4px + var(--ic-top-inset, 0px)) 20px 10px' }}>
         <button onClick={onBack}
           className="w-9 h-9 rounded-pill border border-line bg-white/[0.05] flex items-center justify-center text-white">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none">

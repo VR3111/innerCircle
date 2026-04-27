@@ -178,7 +178,7 @@ function YourRankCard({ yourRank, yourScore, yourChange, agentColor }: YourRankC
       borderTop: `1px solid ${TOKENS.line}`,
       background: TOKENS.bg,
       padding: '12px 20px',
-      paddingBottom: 'calc(12px + var(--ic-bot-inset, 0px))',
+      paddingBottom: 'calc(4px + var(--ic-bot-inset, 0px))',
     }}>
       <div style={{
         borderRadius: 14,
@@ -290,7 +290,7 @@ export function CategoryLeaderboardScreen() {
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div style={{
         position: 'relative', zIndex: 2,
-        padding: 'calc(18px + var(--ic-top-inset, 0px)) 20px 16px',
+        padding: 'calc(8px + var(--ic-top-inset, 0px)) 20px 16px',
         background: `linear-gradient(180deg, ${A.color}22 0%, ${A.color}0d 40%, ${TOKENS.bg} 100%)`,
       }}>
         {/* Ambient orb — top-right; ic-float-corner keyframe from globals */}

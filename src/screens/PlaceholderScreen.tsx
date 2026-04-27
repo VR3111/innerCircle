@@ -5,7 +5,7 @@ export function PlaceholderScreen({ title, note }: { title: string; note?: strin
   return (
     <div className="flex flex-col h-full bg-bg">
       <header className="flex items-center gap-3 px-5 border-b border-line"
-        style={{ padding: 'calc(14px + var(--ic-top-inset, 0px)) 20px 14px' }}>
+        style={{ padding: 'calc(4px + var(--ic-top-inset, 0px)) 20px 14px' }}>
         <button onClick={() => navigate(-1)}
           className="w-9 h-9 rounded-pill border border-line bg-white/[0.05] flex items-center justify-center text-white">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none">

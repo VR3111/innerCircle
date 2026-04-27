@@ -53,7 +53,7 @@ export function BottomNav({ accent = '#E9C46A' }: { accent?: string }) {
   return (
     <nav
       className="relative flex items-center justify-around border-t border-line bg-[rgba(10,10,10,0.96)]"
-      style={{ padding: '12px 24px calc(18px + var(--ic-bot-inset, 0px))' }}
+      style={{ padding: '8px 24px calc(6px + var(--ic-bot-inset, 0px))' }}
     >
       {TABS.map(t => (
         <NavLink

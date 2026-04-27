@@ -176,7 +176,7 @@ export function ExploreScreen() {
     }}>
 
       {/* ── Section 1: Header ───────────────────────────────────────────────── */}
-      <div style={{ padding: 'calc(20px + var(--ic-top-inset,0px)) 20px 8px' }}>
+      <div style={{ padding: 'calc(10px + var(--ic-top-inset,0px)) 20px 8px' }}>
         <div style={{
           fontFamily: 'ui-monospace, monospace',
           fontSize: 10, color: TOKENS.mute, letterSpacing: 1.8, marginBottom: 6,

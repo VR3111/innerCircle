@@ -161,7 +161,7 @@ export function SettingsScreen() {
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: 'calc(18px + var(--ic-top-inset, 0px)) 20px 8px',
+        padding: 'calc(8px + var(--ic-top-inset, 0px)) 20px 8px',
       }}>
         <button onClick={() => navigate(-1)} style={iconBtnStyle} aria-label="Back">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none">

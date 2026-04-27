@@ -255,7 +255,7 @@ export function ArenasHubScreen() {
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div style={{
-        padding: 'calc(20px + var(--ic-top-inset,0px)) 20px 12px',
+        padding: 'calc(10px + var(--ic-top-inset,0px)) 20px 12px',
         position: 'relative', zIndex: 2,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

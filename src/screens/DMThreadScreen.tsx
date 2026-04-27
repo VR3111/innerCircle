@@ -1099,7 +1099,7 @@ export function DMThreadScreen() {
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10,
-        padding: 'calc(16px + var(--ic-top-inset,0px)) 18px 10px',
+        padding: 'calc(6px + var(--ic-top-inset,0px)) 18px 10px',
         borderBottom: `1px solid ${headerBorderColor}`,
         flexShrink: 0,
         position: 'relative',
@@ -1423,7 +1423,7 @@ export function DMThreadScreen() {
           border: `1px solid ${TOKENS.line2}`,
           borderRadius: 999,
           padding: '8px 8px 8px 14px',
-          margin: `10px 14px calc(16px + var(--ic-bot-inset,0px))`,
+          margin: `10px 14px calc(4px + var(--ic-bot-inset,0px))`,
         }}>
           {/* + (attachment) button — replaces paperclip */}
           <button

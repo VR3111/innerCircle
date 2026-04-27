@@ -91,7 +91,7 @@ export function ProfileScreen() {
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10,
-        padding: 'calc(18px + var(--ic-top-inset,0px)) 20px 8px',
+        padding: 'calc(8px + var(--ic-top-inset,0px)) 20px 8px',
         borderBottom: `1px solid ${TOKENS.line}`,
         flexShrink: 0,
       }}>

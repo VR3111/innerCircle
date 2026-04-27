@@ -35,7 +35,7 @@ export function LeaderboardScreen({ entries: entriesProp }: LeaderboardScreenPro
 
   return (
     <div className="flex flex-col h-full bg-bg">
-      <header className="px-5" style={{ padding: 'calc(18px + var(--ic-top-inset, 0px)) 20px 10px' }}>
+      <header className="px-5" style={{ padding: 'calc(8px + var(--ic-top-inset, 0px)) 20px 10px' }}>
         <div className="flex items-center justify-between">
           <div>
             <div className="font-mono text-[10px] text-mute tracking-[0.18em] mb-1.5">LEADERBOARD · WK 16</div>

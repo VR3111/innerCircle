@@ -94,7 +94,7 @@ export function PaywallScreen() {
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: 'calc(16px + var(--ic-top-inset, 0px)) 18px 8px',
+        padding: 'calc(6px + var(--ic-top-inset, 0px)) 18px 8px',
         position: 'relative',
       }}>
         <button onClick={() => navigate(-1)} style={iconBtnStyle} aria-label="Back">
@@ -242,7 +242,7 @@ export function PaywallScreen() {
       </div>
 
       {/* ── Subscribe CTA + fine print ─────────────────────────────────────── */}
-      <div style={{ padding: 'calc(18px) 22px calc(28px + var(--ic-bot-inset, 0px))' }}>
+      <div style={{ padding: '18px 22px calc(16px + var(--ic-bot-inset, 0px))' }}>
         <button
           onClick={subscribe}
           disabled={loading}

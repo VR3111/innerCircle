@@ -190,7 +190,7 @@ export function ComposeScreen() {
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: 'calc(16px + var(--ic-top-inset,0px)) 18px 10px',
+        padding: 'calc(6px + var(--ic-top-inset,0px)) 18px 10px',
         borderBottom: `1px solid ${TOKENS.line}`,
         flexShrink: 0,
       }}>

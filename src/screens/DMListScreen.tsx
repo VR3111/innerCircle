@@ -209,7 +209,7 @@ export function DMListScreen() {
       {/* Header */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: 'calc(18px + var(--ic-top-inset,0px)) 20px 8px',
+        padding: 'calc(8px + var(--ic-top-inset,0px)) 20px 8px',
         flexShrink: 0,
       }}>
         <button type="button" onClick={() => navigate(-1)} style={iconBtnStyle}>

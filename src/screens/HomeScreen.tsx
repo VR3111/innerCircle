@@ -32,7 +32,7 @@ export function HomeScreen() {
       {/* top bar */}
       <header
         className="flex items-center justify-between"
-        style={{ padding: 'calc(18px + var(--ic-top-inset, 0px)) 20px 14px' }}
+        style={{ padding: 'calc(8px + var(--ic-top-inset, 0px)) 20px 10px' }}
       >
         <Logo />
         <div className="flex items-center gap-2">

@@ -131,7 +131,7 @@ export function OnboardingScreen() {
       {/* ── Header: logo left, skip right ─────────────────────────────────── */}
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: 'calc(18px + var(--ic-top-inset, 0px)) 20px 8px',
+        padding: 'calc(8px + var(--ic-top-inset, 0px)) 20px 8px',
       }}>
         {/*
           Prototype uses SocialLevelingLogo (horizontal mark+wordmark lockup, size=0.85).
@@ -215,7 +215,7 @@ export function OnboardingScreen() {
       </div>
 
       {/* ── CTA button ────────────────────────────────────────────────────── */}
-      <div style={{ padding: '0 20px calc(28px + var(--ic-bot-inset, 0px))' }}>
+      <div style={{ padding: '0 20px calc(16px + var(--ic-bot-inset, 0px))' }}>
         <button
           onClick={goNext}
           style={{
