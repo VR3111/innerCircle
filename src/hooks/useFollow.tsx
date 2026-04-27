@@ -6,8 +6,10 @@ import {
   useCallback,
   type ReactNode,
 } from 'react'
-import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+
+const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL      as string
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
 interface FollowContextType {
   followedIds: Set<string>
@@ -26,28 +28,38 @@ const FollowContext = createContext<FollowContextType>({
 })
 
 export function FollowProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth()
+  const { user, session } = useAuth()
   const [followedIds, setFollowedIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !session?.access_token) {
       setFollowedIds(new Set())
       setLoading(false)
       return
     }
 
     setLoading(true)
-    supabase
-      .from('follows')
-      .select('agent_id')
-      .eq('user_id', user.id)
-      .then(({ data }) => {
-        setFollowedIds(new Set(data?.map((f) => f.agent_id) ?? []))
+    const token = session.access_token
+
+    fetch(
+      `${SUPABASE_URL}/rest/v1/follows?user_id=eq.${user.id}&select=agent_id`,
+      {
+        headers: {
+          apikey:        SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    )
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data: { agent_id: string }[]) => {
+        setFollowedIds(new Set(data.map((f) => f.agent_id)))
         setLoading(false)
       })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id])
+      .catch(() => {
+        setLoading(false)
+      })
+  }, [user?.id, session?.access_token])
 
   const isFollowing = useCallback(
     (agentId: string) => followedIds.has(agentId),
@@ -56,15 +68,25 @@ export function FollowProvider({ children }: { children: ReactNode }) {
 
   const followAgent = useCallback(
     async (agentId: string) => {
-      if (!user) return
+      if (!user || !session?.access_token) return
+      const token = session.access_token
 
+      // Optimistic
       setFollowedIds((prev) => new Set([...prev, agentId]))
 
-      const { error } = await supabase
-        .from('follows')
-        .insert({ user_id: user.id, agent_id: agentId })
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/follows`, {
+        method: 'POST',
+        headers: {
+          apikey:         SUPABASE_ANON_KEY,
+          Authorization:  `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          Prefer:         'return=minimal',
+        },
+        body: JSON.stringify({ user_id: user.id, agent_id: agentId }),
+      })
 
-      if (error) {
+      if (!res.ok) {
+        // Revert
         setFollowedIds((prev) => {
           const next = new Set(prev)
           next.delete(agentId)
@@ -73,35 +95,62 @@ export function FollowProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      await supabase.rpc('adjust_agent_followers', { p_agent_id: agentId, p_delta: 1 })
+      // Fire-and-forget: bump agents.followers counter
+      void fetch(`${SUPABASE_URL}/rest/v1/rpc/adjust_agent_followers`, {
+        method: 'POST',
+        headers: {
+          apikey:         SUPABASE_ANON_KEY,
+          Authorization:  `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ p_agent_id: agentId, p_delta: 1 }),
+      })
     },
-    [user],
+    [user, session?.access_token],
   )
 
   const unfollowAgent = useCallback(
     async (agentId: string) => {
-      if (!user) return
+      if (!user || !session?.access_token) return
+      const token = session.access_token
 
+      // Optimistic
       setFollowedIds((prev) => {
         const next = new Set(prev)
         next.delete(agentId)
         return next
       })
 
-      const { error } = await supabase
-        .from('follows')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('agent_id', agentId)
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/follows?user_id=eq.${user.id}&agent_id=eq.${agentId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            apikey:         SUPABASE_ANON_KEY,
+            Authorization:  `Bearer ${token}`,
+            Prefer:         'return=minimal',
+          },
+        },
+      )
 
-      if (error) {
+      if (!res.ok) {
+        // Revert
         setFollowedIds((prev) => new Set([...prev, agentId]))
         return
       }
 
-      await supabase.rpc('adjust_agent_followers', { p_agent_id: agentId, p_delta: -1 })
+      // Fire-and-forget: decrement agents.followers counter
+      void fetch(`${SUPABASE_URL}/rest/v1/rpc/adjust_agent_followers`, {
+        method: 'POST',
+        headers: {
+          apikey:         SUPABASE_ANON_KEY,
+          Authorization:  `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ p_agent_id: agentId, p_delta: -1 }),
+      })
     },
-    [user],
+    [user, session?.access_token],
   )
 
   return (

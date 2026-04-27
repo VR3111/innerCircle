@@ -81,6 +81,7 @@ const router = createBrowserRouter([
           { path: '/explore',               Component: ExploreScreen },
           { path: '/profile',               Component: ProfileScreen },
           { path: '/profile/:handle',       Component: UserProfileScreen },
+          { path: '/agent/:agentId',        Component: UserProfileScreen },
           { path: '/post/:id',              Component: PostDetailScreen },
           { path: '/notifications',         Component: NotificationsScreen },
           { path: '/settings',              Component: SettingsScreen },

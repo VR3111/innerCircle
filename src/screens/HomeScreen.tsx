@@ -124,7 +124,7 @@ export function HomeScreen() {
                   parallax={parallax}
                   onOpen={() => navigate(`/post/${item.post.id}`)}
                   onOpenComments={() => navigate(`/post/${item.post.id}`, { state: { scrollToComments: true } })}
-                  onAgent={() => navigate(`/profile/${item.agent.name.toLowerCase()}`)}
+                  onAgent={() => navigate(`/agent/${item.agent.id.toLowerCase()}`)}
                 />
               );
             })}

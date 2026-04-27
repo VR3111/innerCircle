@@ -42,10 +42,20 @@ function timeAgo(isoString: string): string {
 const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL      as string
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string
 
-export function usePosts(agentId?: string) {
+interface UsePostsOptions {
+  orderBy?: string   // PostgREST order clause, e.g. 'likes.desc'
+  limit?: number     // max rows returned
+  since?: string     // ISO timestamp — created_at >= this value
+}
+
+export function usePosts(agentId?: string, opts?: UsePostsOptions) {
   const [posts, setPosts]     = useState<PostWithAgent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
+
+  const orderBy = opts?.orderBy
+  const limit   = opts?.limit
+  const since   = opts?.since
 
   useEffect(() => {
     let cancelled = false
@@ -65,7 +75,9 @@ export function usePosts(agentId?: string) {
       try {
         const url = new URL(`${SUPABASE_URL}/rest/v1/posts`)
         url.searchParams.set('select', '*,post_likes(count),replies(count),profiles!user_id(username,display_name,avatar_url)')
-        url.searchParams.set('order', 'created_at.desc')
+        url.searchParams.set('order', orderBy ?? 'created_at.desc')
+        if (limit) url.searchParams.set('limit', String(limit))
+        if (since) url.searchParams.set('created_at', `gte.${since}`)
         if (agentId) url.searchParams.set('agent_id', `eq.${agentId}`)
 
         const res = await fetch(url.toString(), {
@@ -128,7 +140,7 @@ export function usePosts(agentId?: string) {
       cancelled = true
       if (timeoutId) clearTimeout(timeoutId)
     }
-  }, [agentId])
+  }, [agentId, orderBy, limit, since])
 
   return { posts, loading, error }
 }

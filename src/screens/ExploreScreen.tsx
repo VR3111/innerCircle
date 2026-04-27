@@ -9,16 +9,18 @@
 //   OPPORTUNITY ZONES — unranked/low-rank categories to suggest entry
 //
 // BottomNav is intentionally absent — MobileLayout provides it.
-// Search bar is visual-only for v1 (TODO: wire to backend search API).
-// Follow buttons are local state only for v1 (TODO: persist to user profile;
-//   semantically this toggles "include this category in your ALL feed").
+// Search bar is disabled for v1 (TODO: wire to backend search API).
+// Follow buttons persist to follows table via useFollow context.
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { AGENTS, AGENT_ORDER, TOKENS } from '@/lib/design-tokens';
 import { AgentDot, LivePulse, Sparkline, PlaceholderImg } from '@/components/primitives';
-import { POSTS, fmtCompact, MOCK_USERS } from '@/lib/mock-data';
+import { fmtCompact, MOCK_USERS } from '@/lib/mock-data';
 import { LEADERBOARD_DATA, type CategoryAgentId } from '@/lib/leaderboard-mock';
+import { usePosts, type PostWithAgent } from '../hooks/usePosts';
+import { useFollow } from '../hooks/useFollow';
+import { Skeleton } from '@/components/states';
 
 // ─── Module-level constants (pure derivations from imported data) ─────────────
 
@@ -140,27 +142,31 @@ function CategoryCard({ agentId, isFollowed, onToggleFollow, onNavigate }: Categ
 
 // ─── ExploreScreen ────────────────────────────────────────────────────────────
 
+// 7-day ISO timestamp for trending window
+const SEVEN_DAYS_AGO = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
 export function ExploreScreen() {
   const navigate = useNavigate();
-  const [query, setQuery] = useState('');
-  const [focused, setFocused] = useState(false);
-  // TODO: persist follows to user profile; semantics = "include category in ALL feed"
-  const [followed, setFollowed] = useState<Set<CategoryAgentId>>(new Set());
+  const { isFollowing, followAgent, unfollowAgent } = useFollow();
 
-  const trending = POSTS.slice(0, 3);
+  // TRENDING: top 3 posts by likes in the last 7 days
+  const { posts: trendingRaw, loading: trendingLoading } = usePosts(
+    undefined,
+    useMemo(() => ({ orderBy: 'likes.desc', limit: 3, since: SEVEN_DAYS_AGO }), []),
+  );
 
-  // HOT IN TECH — filter to Circuit (Tech) posts.
-  // v1 renders if >= 1 post; spec mentions 2-3 but mock has 1 Circuit post.
-  // TODO: with a real backend this will return 2-3 posts from the user's top category.
-  const techPosts = POSTS.filter(p => p.agent === 'CIRCUIT');
+  // HOT IN TECH: top 3 Circuit posts by likes
+  const { posts: techRaw, loading: techLoading } = usePosts(
+    'circuit',
+    useMemo(() => ({ orderBy: 'likes.desc', limit: 3 }), []),
+  );
 
   function toggleFollow(id: CategoryAgentId) {
-    setFollowed(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    if (isFollowing(id.toLowerCase())) {
+      unfollowAgent(id.toLowerCase());
+    } else {
+      followAgent(id.toLowerCase());
+    }
   }
 
   return (
@@ -187,33 +193,25 @@ export function ExploreScreen() {
         </h1>
       </div>
 
-      {/* ── Section 2: Search bar ───────────────────────────────────────────── */}
-      {/* Visual only for v1 — TODO: wire to search API when backend is ready */}
-      <div style={{ padding: '16px 20px 8px' }}>
+      {/* ── Section 2: Search bar (disabled for v1) ──────────────────────── */}
+      <div style={{ padding: '16px 20px 8px', opacity: 0.45, pointerEvents: 'none' }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10,
           background: TOKENS.bg2,
-          border: `1px solid ${focused ? TOKENS.gold + '66' : TOKENS.line2}`,
+          border: `1px solid ${TOKENS.line2}`,
           borderRadius: 12, padding: '12px 14px',
-          transition: 'border-color 240ms, box-shadow 240ms',
-          boxShadow: focused ? `0 0 0 4px ${TOKENS.gold}14` : 'none',
         }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
             <circle cx="11" cy="11" r="7" stroke={TOKENS.mute} strokeWidth="1.7" />
             <path d="M16 16l5 5" stroke={TOKENS.mute} strokeWidth="1.7" strokeLinecap="round" />
           </svg>
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            placeholder="Posts, users, categories…"
-            style={{
-              flex: 1, background: 'none', border: 'none', outline: 'none',
-              fontFamily: 'Inter, system-ui, sans-serif',
-              fontSize: 14, color: TOKENS.text,
-            }}
-          />
+          <span style={{
+            flex: 1,
+            fontFamily: 'Inter, system-ui, sans-serif',
+            fontSize: 14, color: TOKENS.mute2,
+          }}>
+            Search coming soon
+          </span>
           <span style={{
             fontFamily: 'ui-monospace, monospace', fontSize: 9,
             color: TOKENS.mute3, letterSpacing: 1,
@@ -243,78 +241,22 @@ export function ExploreScreen() {
           <span style={{ flex: 1, height: 1, background: TOKENS.line, marginLeft: 6 }} />
         </div>
 
-        <div
-          className="no-scrollbar"
-          style={{ display: 'flex', gap: 12, overflowX: 'auto', padding: '0 20px 8px', scrollbarWidth: 'none' }}
-        >
-          {trending.map((post, i) => {
-            const A = AGENTS[post.agent];
-            return (
-              <div
-                key={post.id}
-                onClick={() => navigate(`/post/${post.id}`)}
-                style={{
-                  minWidth: 240, maxWidth: 240, borderRadius: 14, overflow: 'hidden',
-                  cursor: 'pointer', border: `1px solid ${TOKENS.line}`,
-                  background: TOKENS.bg1, position: 'relative',
-                  transition: 'transform 220ms cubic-bezier(.2,.8,.2,1)',
-                  flexShrink: 0,
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.015)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-              >
-                {/* Agent badge — top left */}
-                <div style={{
-                  position: 'absolute', top: 10, left: 10, zIndex: 2,
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)',
-                  padding: '4px 8px', borderRadius: 999,
-                }}>
-                  <AgentDot agent={post.agent} size={16} clickable={false} />
-                  <span style={{
-                    fontFamily: 'Inter, system-ui, sans-serif',
-                    fontSize: 11, fontWeight: 600, color: '#fff',
-                  }}>
-                    {A.name}
-                  </span>
-                </div>
-
-                {/* Hot rank badge — top right */}
-                <div style={{
-                  position: 'absolute', top: 10, right: 10, zIndex: 2,
-                  fontFamily: 'ui-monospace, monospace', fontSize: 9,
-                  background: TOKENS.gold, color: '#0A0A0A',
-                  padding: '3px 6px', borderRadius: 4, letterSpacing: 0.6,
-                  fontWeight: 700,
-                }}>
-                  #{i + 1}
-                </div>
-
-                <PlaceholderImg kind={post.img} agent={post.agent} height={140} />
-
-                <div style={{ padding: '12px 14px 14px' }}>
-                  <div style={{
-                    fontFamily: 'Inter, system-ui, sans-serif',
-                    fontSize: 13, fontWeight: 600, color: TOKENS.text,
-                    lineHeight: 1.3, letterSpacing: -0.1,
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                  }}>
-                    {post.headline}
-                  </div>
-                  <div style={{
-                    display: 'flex', gap: 12, marginTop: 10,
-                    fontFamily: 'ui-monospace, monospace',
-                    fontSize: 9.5, color: TOKENS.mute2, letterSpacing: 0.8,
-                  }}>
-                    <span>{fmtCompact(post.likes)} REACTS</span>
-                    <span>{fmtCompact(post.replies)} REPLIES</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        {trendingLoading ? (
+          <div style={{ display: 'flex', gap: 12, padding: '0 20px 8px' }}>
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="rounded-[14px] min-w-[240px] h-[220px] shrink-0" />
+            ))}
+          </div>
+        ) : trendingRaw.length > 0 ? (
+          <div
+            className="no-scrollbar"
+            style={{ display: 'flex', gap: 12, overflowX: 'auto', padding: '0 20px 8px', scrollbarWidth: 'none' }}
+          >
+            {trendingRaw.map((item, i) => (
+              <TrendingCard key={item.post.id} item={item} rank={i + 1} onOpen={() => navigate(`/post/${item.post.id}`)} />
+            ))}
+          </div>
+        ) : null}
 
         {/* ── Section 4: CATEGORIES grid ────────────────────────────────────── */}
         <div style={{ padding: '24px 20px 10px', display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -340,7 +282,7 @@ export function ExploreScreen() {
             <CategoryCard
               key={id}
               agentId={id}
-              isFollowed={followed.has(id)}
+              isFollowed={isFollowing(id.toLowerCase())}
               onToggleFollow={() => toggleFollow(id)}
               onNavigate={() => navigate(`/leaderboard/${id}`)}
             />
@@ -435,7 +377,30 @@ export function ExploreScreen() {
         {/* v1 hardcoded to CIRCUIT (taylor.alpha's strongest category, rank 7).  */}
         {/* TODO: pull user's top category from profile + backend-filtered posts.  */}
         {/* Renders if >= 1 post; spec ideally shows 2-3 but mock has 1 per agent. */}
-        {techPosts.length >= 1 && (
+        {techLoading ? (
+          <>
+            <div style={{ padding: '24px 20px 10px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{
+                fontFamily: 'ui-monospace, monospace',
+                fontSize: 10, color: TOKENS.text, letterSpacing: 1.8,
+              }}>
+                HOT IN TECH
+              </span>
+              <span style={{ flex: 1, height: 1, background: TOKENS.line, marginLeft: 6 }} />
+              <span style={{
+                fontFamily: 'ui-monospace, monospace', fontSize: 9,
+                color: AGENTS.CIRCUIT.color, letterSpacing: 1,
+              }}>
+                CIRCUIT
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: 10, padding: '0 20px 8px' }}>
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} className="rounded-[14px] min-w-[200px] h-[190px] shrink-0" />
+              ))}
+            </div>
+          </>
+        ) : techRaw.length > 0 ? (
           <>
             <div style={{ padding: '24px 20px 10px', display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{
@@ -457,76 +422,12 @@ export function ExploreScreen() {
               className="no-scrollbar"
               style={{ display: 'flex', gap: 10, overflowX: 'auto', padding: '0 20px 8px', scrollbarWidth: 'none' }}
             >
-              {techPosts.map((post, i) => {
-                const A = AGENTS[post.agent];
-                return (
-                  <div
-                    key={post.id}
-                    onClick={() => navigate(`/post/${post.id}`)}
-                    style={{
-                      minWidth: 200, maxWidth: 200, borderRadius: 14, overflow: 'hidden',
-                      cursor: 'pointer', border: `1px solid ${TOKENS.line}`,
-                      background: TOKENS.bg1, position: 'relative',
-                      transition: 'transform 220ms cubic-bezier(.2,.8,.2,1)',
-                      flexShrink: 0,
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.015)'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-                  >
-                    {/* Agent badge */}
-                    <div style={{
-                      position: 'absolute', top: 10, left: 10, zIndex: 2,
-                      display: 'flex', alignItems: 'center', gap: 6,
-                      background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)',
-                      padding: '4px 8px', borderRadius: 999,
-                    }}>
-                      <AgentDot agent={post.agent} size={14} clickable={false} />
-                      <span style={{
-                        fontFamily: 'Inter, system-ui, sans-serif',
-                        fontSize: 10, fontWeight: 600, color: '#fff',
-                      }}>
-                        {A.name}
-                      </span>
-                    </div>
-
-                    {/* Hot rank badge */}
-                    <div style={{
-                      position: 'absolute', top: 10, right: 10, zIndex: 2,
-                      fontFamily: 'ui-monospace, monospace', fontSize: 8,
-                      background: AGENTS.CIRCUIT.color, color: '#0A0A0A',
-                      padding: '3px 5px', borderRadius: 4, letterSpacing: 0.6,
-                      fontWeight: 700,
-                    }}>
-                      #{i + 1}
-                    </div>
-
-                    <PlaceholderImg kind={post.img} agent={post.agent} height={118} />
-
-                    <div style={{ padding: '10px 12px 12px' }}>
-                      <div style={{
-                        fontFamily: 'Inter, system-ui, sans-serif',
-                        fontSize: 12, fontWeight: 600, color: TOKENS.text,
-                        lineHeight: 1.3, letterSpacing: -0.1,
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                      }}>
-                        {post.headline}
-                      </div>
-                      <div style={{
-                        display: 'flex', gap: 10, marginTop: 8,
-                        fontFamily: 'ui-monospace, monospace',
-                        fontSize: 9, color: TOKENS.mute2, letterSpacing: 0.8,
-                      }}>
-                        <span>{fmtCompact(post.likes)} REACTS</span>
-                        <span>{fmtCompact(post.replies)} REPLIES</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+              {techRaw.map((item, i) => (
+                <TechCard key={item.post.id} item={item} rank={i + 1} onOpen={() => navigate(`/post/${item.post.id}`)} />
+              ))}
             </div>
           </>
-        )}
+        ) : null}
 
         {/* ── Section 7: OPPORTUNITY ZONES ─────────────────────────────────── */}
         {/* Surfaces categories where taylor.alpha has no/low rank = easier entry. */}
@@ -592,6 +493,154 @@ export function ExploreScreen() {
         </div>
 
       </div>{/* end scrollable body */}
+    </div>
+  );
+}
+
+// ─── TrendingCard ─────────────────────────────────────────────────────────────
+// Renders a single trending post card (240px wide) with real Supabase data.
+
+function TrendingCard({ item, rank, onOpen }: { item: PostWithAgent; rank: number; onOpen: () => void }) {
+  const { post, agent } = item;
+  const agentId = post.agentId.toUpperCase() as import('@/lib/design-tokens').AgentId;
+  return (
+    <div
+      onClick={onOpen}
+      style={{
+        minWidth: 240, maxWidth: 240, borderRadius: 14, overflow: 'hidden',
+        cursor: 'pointer', border: `1px solid ${TOKENS.line}`,
+        background: TOKENS.bg1, position: 'relative',
+        transition: 'transform 220ms cubic-bezier(.2,.8,.2,1)',
+        flexShrink: 0,
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.015)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+    >
+      <div style={{
+        position: 'absolute', top: 10, left: 10, zIndex: 2,
+        display: 'flex', alignItems: 'center', gap: 6,
+        background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)',
+        padding: '4px 8px', borderRadius: 999,
+      }}>
+        <AgentDot agent={agentId} size={16} clickable={false} />
+        <span style={{
+          fontFamily: 'Inter, system-ui, sans-serif',
+          fontSize: 11, fontWeight: 600, color: '#fff',
+        }}>
+          {agent.name}
+        </span>
+      </div>
+
+      <div style={{
+        position: 'absolute', top: 10, right: 10, zIndex: 2,
+        fontFamily: 'ui-monospace, monospace', fontSize: 9,
+        background: TOKENS.gold, color: '#0A0A0A',
+        padding: '3px 6px', borderRadius: 4, letterSpacing: 0.6,
+        fontWeight: 700,
+      }}>
+        #{rank}
+      </div>
+
+      {post.image ? (
+        <img src={post.image} alt={post.headline} loading="lazy"
+          style={{ width: '100%', height: 140, objectFit: 'cover', display: 'block' }} />
+      ) : (
+        <PlaceholderImg kind="grid" agent={agentId} height={140} />
+      )}
+
+      <div style={{ padding: '12px 14px 14px' }}>
+        <div style={{
+          fontFamily: 'Inter, system-ui, sans-serif',
+          fontSize: 13, fontWeight: 600, color: TOKENS.text,
+          lineHeight: 1.3, letterSpacing: -0.1,
+          display: '-webkit-box',
+          WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+        }}>
+          {post.headline}
+        </div>
+        <div style={{
+          display: 'flex', gap: 12, marginTop: 10,
+          fontFamily: 'ui-monospace, monospace',
+          fontSize: 9.5, color: TOKENS.mute2, letterSpacing: 0.8,
+        }}>
+          <span>{fmtCompact(post.reactions)} REACTS</span>
+          <span>{fmtCompact(post.replies)} REPLIES</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── TechCard ─────────────────────────────────────────────────────────────────
+// Renders a single HOT IN TECH card (200px wide) with real Supabase data.
+
+function TechCard({ item, rank, onOpen }: { item: PostWithAgent; rank: number; onOpen: () => void }) {
+  const { post, agent } = item;
+  const agentId = post.agentId.toUpperCase() as import('@/lib/design-tokens').AgentId;
+  return (
+    <div
+      onClick={onOpen}
+      style={{
+        minWidth: 200, maxWidth: 200, borderRadius: 14, overflow: 'hidden',
+        cursor: 'pointer', border: `1px solid ${TOKENS.line}`,
+        background: TOKENS.bg1, position: 'relative',
+        transition: 'transform 220ms cubic-bezier(.2,.8,.2,1)',
+        flexShrink: 0,
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.015)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+    >
+      <div style={{
+        position: 'absolute', top: 10, left: 10, zIndex: 2,
+        display: 'flex', alignItems: 'center', gap: 6,
+        background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)',
+        padding: '4px 8px', borderRadius: 999,
+      }}>
+        <AgentDot agent={agentId} size={14} clickable={false} />
+        <span style={{
+          fontFamily: 'Inter, system-ui, sans-serif',
+          fontSize: 10, fontWeight: 600, color: '#fff',
+        }}>
+          {agent.name}
+        </span>
+      </div>
+
+      <div style={{
+        position: 'absolute', top: 10, right: 10, zIndex: 2,
+        fontFamily: 'ui-monospace, monospace', fontSize: 8,
+        background: AGENTS.CIRCUIT.color, color: '#0A0A0A',
+        padding: '3px 5px', borderRadius: 4, letterSpacing: 0.6,
+        fontWeight: 700,
+      }}>
+        #{rank}
+      </div>
+
+      {post.image ? (
+        <img src={post.image} alt={post.headline} loading="lazy"
+          style={{ width: '100%', height: 118, objectFit: 'cover', display: 'block' }} />
+      ) : (
+        <PlaceholderImg kind="grid" agent={agentId} height={118} />
+      )}
+
+      <div style={{ padding: '10px 12px 12px' }}>
+        <div style={{
+          fontFamily: 'Inter, system-ui, sans-serif',
+          fontSize: 12, fontWeight: 600, color: TOKENS.text,
+          lineHeight: 1.3, letterSpacing: -0.1,
+          display: '-webkit-box',
+          WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+        }}>
+          {post.headline}
+        </div>
+        <div style={{
+          display: 'flex', gap: 10, marginTop: 8,
+          fontFamily: 'ui-monospace, monospace',
+          fontSize: 9, color: TOKENS.mute2, letterSpacing: 0.8,
+        }}>
+          <span>{fmtCompact(post.reactions)} REACTS</span>
+          <span>{fmtCompact(post.replies)} REPLIES</span>
+        </div>
+      </div>
     </div>
   );
 }

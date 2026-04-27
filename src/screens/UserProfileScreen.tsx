@@ -1,27 +1,24 @@
-// UserProfileScreen — view another user's profile at /profile/:handle
+// UserProfileScreen — view another user's or agent's profile
 //
-// Part 2a scope:
-//   ✅ Identity block (avatar ring, name, handle, IC/CC labels, bio)
-//   ✅ Signal score card
-//   ✅ Secondary stats (following / followers+1-if-followed / posts)
-//   ✅ Arenas badges (same filter/pill logic as ProfileScreen)
-//   ✅ Follow button — localStorage persistence, immediate toggle
-//   ✅ Message button — premium → DM thread; free → paywall
-//   ✅ Post grid — 3-column, non-interactive
-//   ✅ Header three-dot menu with Block + Report (non-functional, TODO)
-//   ✅ 404 for unknown handles
-//   ✅ Redirect /profile/vinay → /profile
+// Routes:
+//   /profile/:handle  → user mode (lookup mock user by handle)
+//   /agent/:agentId   → agent mode (lookup agent by id)
 //
-// Part 2b TODO:
-//   - Entry points: DM list rows, Notifications, Post author, Arenas, Explore
+// Both render the same "viewing someone else's profile" layout.
+// Agent mode differs only where specified: avatar, subtitle, stats, etc.
 
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { useNavigate, useParams, Navigate } from 'react-router';
-import { TOKENS, AGENTS } from '@/lib/design-tokens';
+import { useNavigate, useParams, useMatch, Navigate } from 'react-router';
+import { TOKENS, AGENTS as DESIGN_AGENTS, type AgentId } from '@/lib/design-tokens';
 import { AgentDot } from '@/components/primitives';
 import { SLMark } from '@/components/Logo';
-import { MOCK_USERS, CURRENT_USER, DM_THREADS, getPostsForUser } from '@/lib/mock-data';
+import {
+  MOCK_USERS, CURRENT_USER, DM_THREADS,
+  getPostsForUser, fmtCompact,
+} from '@/lib/mock-data';
 import { isFollowing, setFollowing as persistFollowing } from '@/lib/follow-preferences';
+import { useAgent } from '@/hooks/useAgent';
+import { useAgentPosts } from '@/hooks/useAgentPosts';
 
 const FONT = 'Inter, system-ui, sans-serif';
 const MONO = 'ui-monospace, monospace';
@@ -42,22 +39,39 @@ const iconBtnStyle: React.CSSProperties = {
 
 export function UserProfileScreen() {
   const navigate = useNavigate();
-  const { handle = '' } = useParams<{ handle: string }>();
 
-  // ── All hooks unconditionally first ───────────────────────────────────────
+  // ── Route detection ────────────────────────────────────────────────────────
+  const agentMatch = useMatch('/agent/:agentId');
+  const { handle: rawHandle } = useParams<{ handle: string }>();
+  const isAgentMode = agentMatch !== null;
+  const agentId = (agentMatch?.params.agentId ?? '').toUpperCase() as AgentId;
+  const agentIdLower = agentId.toLowerCase();
+  const handle = rawHandle ?? '';
 
-  const [isPremium]      = useState(() => localStorage.getItem('sl-premium') === '1');
-  const [following, setFollowState] = useState(() => isFollowing(handle));
+  // ── All hooks unconditionally ──────────────────────────────────────────────
+  const [isPremium] = useState(() => localStorage.getItem('sl-premium') === '1');
+  const [following, setFollowState] = useState(() =>
+    isAgentMode ? false : isFollowing(handle),
+  );
   const [followHovered, setFollowHovered] = useState(false);
-  const [showMenu, setShowMenu]   = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
 
-  const menuRef       = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const signalCardRef = useRef<HTMLDivElement>(null);
-  const popoverRef    = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const [showSignalInfo, setShowSignalInfo] = useState(false);
 
-  const user  = MOCK_USERS[handle];
-  const posts = useMemo(() => (user ? getPostsForUser(user) : []), [user?.handle]);
+  // ── User-mode data ─────────────────────────────────────────────────────────
+  const user = isAgentMode ? null : MOCK_USERS[handle];
+  const userPosts = useMemo(
+    () => (user ? getPostsForUser(user) : []),
+    [user?.handle],
+  );
+
+  // ── Agent-mode data ────────────────────────────────────────────────────────
+  const designAgent = isAgentMode ? DESIGN_AGENTS[agentId] : null;
+  const { agent: agentData, loading: agentLoading } = useAgent(agentIdLower);
+  const { posts: agentPosts, loading: agentPostsLoading } = useAgentPosts(isAgentMode ? agentIdLower : null);
 
   // Close three-dot menu on outside click
   useEffect(() => {
@@ -85,69 +99,93 @@ export function UserProfileScreen() {
     return () => document.removeEventListener('mousedown', handler);
   }, [showSignalInfo]);
 
-  // ── Guards — after all hooks ───────────────────────────────────────────────
+  // ── Own-profile redirect (user mode only) ──────────────────────────────────
+  if (!isAgentMode && handle === CURRENT_USER.handle) {
+    return <Navigate to="/profile" replace />;
+  }
 
-  // Own handle → own profile
-  if (handle === CURRENT_USER.handle) return <Navigate to="/profile" replace />;
-
-  // Unknown handle → 404
-  if (!user) {
+  // ── 404: agent not found ───────────────────────────────────────────────────
+  if (isAgentMode && !designAgent) {
     return (
       <div style={{
-        position: 'absolute', inset: 0,
-        background: TOKENS.bg,
+        position: 'absolute', inset: 0, background: TOKENS.bg,
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
-        padding: '40px 20px',
-        fontFamily: FONT,
+        padding: '40px 20px', fontFamily: FONT,
       }}>
         <div style={{
           fontFamily: MONO, fontSize: 12, letterSpacing: 1.4, color: TOKENS.mute,
-        }}>
-          USER NOT FOUND
-        </div>
+        }}>AGENT NOT FOUND</div>
         <div style={{ fontSize: 14, color: TOKENS.mute2, marginTop: 8, textAlign: 'center' }}>
-          @{handle}
+          {agentIdLower}
         </div>
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          style={{
-            marginTop: 16, background: 'none', border: 'none',
-            color: TOKENS.mute2, cursor: 'pointer',
-            fontFamily: FONT, fontSize: 14, textDecoration: 'underline',
-            padding: 0,
-          }}
-        >
-          Go back
-        </button>
+        <button type="button" onClick={() => navigate(-1)} style={{
+          marginTop: 16, background: 'none', border: 'none', color: TOKENS.mute2,
+          cursor: 'pointer', fontFamily: FONT, fontSize: 14,
+          textDecoration: 'underline', padding: 0,
+        }}>Go back</button>
       </div>
     );
   }
 
-  // ── Derived values ────────────────────────────────────────────────────────
+  // ── 404: user not found ────────────────────────────────────────────────────
+  if (!isAgentMode && !user) {
+    return (
+      <div style={{
+        position: 'absolute', inset: 0, background: TOKENS.bg,
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        padding: '40px 20px', fontFamily: FONT,
+      }}>
+        <div style={{
+          fontFamily: MONO, fontSize: 12, letterSpacing: 1.4, color: TOKENS.mute,
+        }}>USER NOT FOUND</div>
+        <div style={{ fontSize: 14, color: TOKENS.mute2, marginTop: 8, textAlign: 'center' }}>
+          @{handle}
+        </div>
+        <button type="button" onClick={() => navigate(-1)} style={{
+          marginTop: 16, background: 'none', border: 'none', color: TOKENS.mute2,
+          cursor: 'pointer', fontFamily: FONT, fontSize: 14,
+          textDecoration: 'underline', padding: 0,
+        }}>Go back</button>
+      </div>
+    );
+  }
 
-  const displayedFollowers = user.followers + (following ? 1 : 0);
-  const visibleBadges = user.arenaBadges.filter(b => b.rank <= 100).slice(0, 3);
+  // ── Derived values ─────────────────────────────────────────────────────────
 
-  // Find DM thread for this handle (only relevant when premium)
-  const dmThread = isPremium
+  // User-mode values (safe: user is non-null here in user mode)
+  const displayedFollowers = user ? user.followers + (following ? 1 : 0) : 0;
+  const visibleBadges = user
+    ? user.arenaBadges.filter(b => b.rank <= 100).slice(0, 3)
+    : [];
+
+  // Find DM thread for this handle (only relevant when premium, user mode)
+  const dmThread = (!isAgentMode && isPremium)
     ? DM_THREADS.find(t => t.kind === 'user' && t.userHandle === handle)
     : undefined;
   const hasThread = dmThread !== undefined;
 
-  const avatarRingStyle: React.CSSProperties = user.creatorsClub
+  // Avatar ring style (user mode)
+  const avatarRingStyle: React.CSSProperties = user?.creatorsClub
     ? { boxShadow: `0 0 0 2.5px ${TOKENS.gold}, 0 0 20px rgba(212,175,55,0.3)` }
-    : user.isPremium
+    : user?.isPremium
       ? { boxShadow: `0 0 0 2px ${TOKENS.gold}` }
       : { boxShadow: '0 0 0 1.5px rgba(255,255,255,0.10)' };
+
+  // Agent-mode values — live from Supabase
+  const agentFollowers = agentData?.followers ?? 0;
+  const agentPostCount = agentPosts.length;
+  const agentDataReady = isAgentMode ? !agentLoading && !agentPostsLoading : true;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
   const toggleFollow = () => {
     const next = !following;
     setFollowState(next);
-    persistFollowing(handle, next);
+    if (!isAgentMode) {
+      persistFollowing(handle, next);
+    }
   };
 
   const handleMessage = () => {
@@ -155,17 +193,12 @@ export function UserProfileScreen() {
       navigate('/paywall');
       return;
     }
-    // dmThread is pre-computed in derived values; if present, navigate directly
     if (dmThread) {
       navigate('/dm/' + dmThread.id);
     }
-    // No thread → button renders as disabled (see JSX below); no-op here
   };
 
   // ── Follow button style ───────────────────────────────────────────────────
-  // Following: gold filled.  Not-following: gold outline.
-  // Hover applies a subtle opacity shift via followHovered state.
-
   const followBtnStyle: React.CSSProperties = following
     ? {
         flex: 1, height: 42, borderRadius: 12,
@@ -188,6 +221,9 @@ export function UserProfileScreen() {
         cursor: 'pointer',
         transition: 'background 150ms ease',
       };
+
+  // Header title
+  const headerTitle = isAgentMode ? designAgent!.name : 'Profile';
 
   return (
     <div style={{
@@ -215,7 +251,7 @@ export function UserProfileScreen() {
           flex: 1, textAlign: 'center',
           fontFamily: FONT, fontSize: 17, fontWeight: 600, color: TOKENS.text,
         }}>
-          Profile
+          {headerTitle}
         </span>
 
         {/* Three-dot menu — Block + Report (non-functional) */}
@@ -236,23 +272,8 @@ export function UserProfileScreen() {
               borderRadius: 10, padding: 6, minWidth: 160, zIndex: 10,
               boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
             }}>
-              {/* TODO: Block — requires backend; non-functional */}
-              <MenuRow
-                label="Block"
-                danger
-                onClick={() => {
-                  // TODO: block @{handle}
-                  setShowMenu(false);
-                }}
-              />
-              {/* TODO: Report — requires backend; non-functional */}
-              <MenuRow
-                label="Report"
-                onClick={() => {
-                  // TODO: report @{handle}
-                  setShowMenu(false);
-                }}
-              />
+              <MenuRow label="Block" danger onClick={() => setShowMenu(false)} />
+              <MenuRow label="Report" onClick={() => setShowMenu(false)} />
             </div>
           )}
         </div>
@@ -270,39 +291,66 @@ export function UserProfileScreen() {
           padding: '28px 20px 16px',
         }}>
           {/* Avatar */}
-          <div style={{
-            width: 96, height: 96, borderRadius: '50%',
-            background: 'linear-gradient(135deg, #2a2a2a, #121212)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            ...avatarRingStyle,
-          }}>
-            <span style={{
-              fontFamily: FONT, fontSize: 36, fontWeight: 700, color: TOKENS.text,
+          {isAgentMode ? (
+            <div style={{
+              width: 96, height: 96, borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: `0 0 0 2.5px ${designAgent!.color}, 0 0 20px ${designAgent!.color}4d`,
             }}>
-              {user.avatarInitials}
-            </span>
-          </div>
+              <AgentDot agent={agentId} size={96} clickable={false} />
+            </div>
+          ) : (
+            <div style={{
+              width: 96, height: 96, borderRadius: '50%',
+              background: 'linear-gradient(135deg, #2a2a2a, #121212)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              ...avatarRingStyle,
+            }}>
+              <span style={{
+                fontFamily: FONT, fontSize: 36, fontWeight: 700, color: TOKENS.text,
+              }}>
+                {user!.avatarInitials}
+              </span>
+            </div>
+          )}
 
           {/* Display name */}
           <div style={{
             marginTop: 12,
+            display: 'flex', alignItems: 'center', gap: 6,
             fontFamily: FONT, fontSize: 22, fontWeight: 700, color: TOKENS.text,
             textAlign: 'center',
           }}>
-            {user.displayName}
+            {isAgentMode ? designAgent!.name : user!.displayName}
+            {/* Gold star for agents */}
+            {isAgentMode && (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill={TOKENS.gold}>
+                <path d="M12 2l2.5 4.5 5 .8-3.5 3.5.8 5L12 13.5l-4.8 2.3.8-5L4.5 7.3l5-.8L12 2z"/>
+              </svg>
+            )}
           </div>
 
-          {/* Handle */}
-          <div style={{
-            marginTop: 2,
-            fontFamily: FONT, fontSize: 13, color: TOKENS.mute2,
-            textAlign: 'center',
-          }}>
-            @{user.handle}
-          </div>
+          {/* Subtitle */}
+          {isAgentMode ? (
+            <div style={{
+              marginTop: 2,
+              fontFamily: FONT, fontSize: 13, color: TOKENS.mute2,
+              textAlign: 'center',
+            }}>
+              AGENT · {designAgent!.tag.toUpperCase()}
+            </div>
+          ) : (
+            <div style={{
+              marginTop: 2,
+              fontFamily: FONT, fontSize: 13, color: TOKENS.mute2,
+              textAlign: 'center',
+            }}>
+              @{user!.handle}
+            </div>
+          )}
 
-          {/* Inner Circle label */}
-          {user.isPremium && (
+          {/* Inner Circle label — user mode only */}
+          {!isAgentMode && user!.isPremium && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
               <SLMark size={14} color={TOKENS.gold} />
               <span style={{
@@ -311,14 +359,14 @@ export function UserProfileScreen() {
             </div>
           )}
 
-          {/* Creators Club label */}
-          {user.creatorsClub && (
+          {/* Creators Club label — user mode only */}
+          {!isAgentMode && user!.creatorsClub && (
             <div style={{
               marginTop: 3,
               fontFamily: MONO, fontSize: 9, letterSpacing: 1.4, color: TOKENS.gold,
               textAlign: 'center',
             }}>
-              CREATORS CLUB · {user.creatorsClub.category}
+              CREATORS CLUB · {user!.creatorsClub.category}
             </div>
           )}
 
@@ -329,11 +377,11 @@ export function UserProfileScreen() {
             lineHeight: 1.5, textAlign: 'center',
             maxWidth: 320,
           }}>
-            {user.bio}
+            {isAgentMode ? designAgent!.tagline : user!.bio}
           </div>
         </div>
 
-        {/* ── Action buttons: Follow + Message ─────────────────────────────── */}
+        {/* ── Action buttons ──────────────────────────────────────────────────── */}
         <div style={{ marginTop: 16, padding: '0 20px' }}>
           <div style={{ display: 'flex', gap: 10 }}>
 
@@ -348,11 +396,26 @@ export function UserProfileScreen() {
               {following ? 'Following' : 'Follow'}
             </button>
 
-            {/* Message — three states:
-                  (a) !isPremium         → paywall prompt
-                  (b) isPremium+thread   → navigate to DM thread
-                  (c) isPremium+no thread → disabled "Message unavailable"   */}
-            {isPremium && !hasThread ? (
+            {/* Message button */}
+            {isAgentMode ? (
+              <div style={{
+                flex: 1, height: 42, borderRadius: 12,
+                background: 'rgba(212,175,55,0.08)',
+                border: '1px solid rgba(212,175,55,0.3)',
+                color: TOKENS.gold,
+                fontFamily: FONT, fontSize: 14, fontWeight: 500,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                opacity: 0.5, cursor: 'not-allowed', pointerEvents: 'none',
+              }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="11" width="18" height="11" rx="2"
+                    stroke="currentColor" strokeWidth="2"/>
+                  <path d="M7 11V7a5 5 0 0110 0v4"
+                    stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+                Message
+              </div>
+            ) : isPremium && !hasThread ? (
               <div style={{
                 flex: 1, height: 42, borderRadius: 12,
                 background: 'rgba(255,255,255,0.04)',
@@ -360,8 +423,7 @@ export function UserProfileScreen() {
                 color: TOKENS.mute2,
                 fontFamily: FONT, fontSize: 14, fontWeight: 500,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'not-allowed',
-                userSelect: 'none',
+                cursor: 'not-allowed', userSelect: 'none',
               }}>
                 Message unavailable
               </div>
@@ -393,81 +455,90 @@ export function UserProfileScreen() {
           </div>
         </div>
 
-        {/* ── Signal score ──────────────────────────────────────────────────── */}
-        <div style={{ marginTop: 18, padding: '0 20px', position: 'relative' }}>
-          <div
-            ref={signalCardRef}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              background: 'rgba(255,255,255,0.02)',
-              border: `1px solid ${TOKENS.line}`,
-              borderRadius: 14,
-              padding: '14px 18px',
-            }}
-          >
-            <div>
-              <div style={{
-                fontFamily: MONO, fontSize: 10, letterSpacing: 1.4, color: TOKENS.mute2,
-              }}>SIGNAL SCORE</div>
-              <div style={{
-                fontFamily: FONT, fontSize: 28, fontWeight: 700, color: TOKENS.gold,
-                marginTop: 2,
-              }}>
-                {user.signalScore.toLocaleString()}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowSignalInfo(v => !v)}
-              style={{
-                width: 22, height: 22, borderRadius: '50%',
-                background: 'rgba(255,255,255,0.06)',
-                border: `1px solid ${TOKENS.line2}`,
-                cursor: 'pointer', color: TOKENS.mute2,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontFamily: MONO, fontSize: 12, fontWeight: 700,
-                flexShrink: 0,
-              }}
-            >?</button>
-          </div>
-
-          {showSignalInfo && (
+        {/* ── Signal score — user mode only ───────────────────────────────────── */}
+        {!isAgentMode && (
+          <div style={{ marginTop: 18, padding: '0 20px', position: 'relative' }}>
             <div
-              ref={popoverRef}
+              ref={signalCardRef}
               style={{
-                position: 'absolute',
-                top: 'calc(100% + 8px)', left: 0, right: 0,
-                zIndex: 10,
-                background: TOKENS.bg1,
-                border: `1px solid ${TOKENS.line2}`,
-                borderRadius: 12,
-                padding: '12px 14px',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                background: 'rgba(255,255,255,0.02)',
+                border: `1px solid ${TOKENS.line}`,
+                borderRadius: 14,
+                padding: '14px 18px',
               }}
             >
-              <div style={{
-                fontFamily: FONT, fontSize: 13, color: TOKENS.mute, lineHeight: 1.5,
-              }}>
-                signalScore reflects activity across agent categories: posts, engagement, streaks, and retention. Updated daily.
+              <div>
+                <div style={{
+                  fontFamily: MONO, fontSize: 10, letterSpacing: 1.4, color: TOKENS.mute2,
+                }}>SIGNAL SCORE</div>
+                <div style={{
+                  fontFamily: FONT, fontSize: 28, fontWeight: 700, color: TOKENS.gold,
+                  marginTop: 2,
+                }}>
+                  {user!.signalScore.toLocaleString()}
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => setShowSignalInfo(v => !v)}
+                style={{
+                  width: 22, height: 22, borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.06)',
+                  border: `1px solid ${TOKENS.line2}`,
+                  cursor: 'pointer', color: TOKENS.mute2,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: MONO, fontSize: 12, fontWeight: 700,
+                  flexShrink: 0,
+                }}
+              >?</button>
             </div>
-          )}
-        </div>
 
-        {/* ── Stats row ────────────────────────────────────────────────────── */}
-        <div style={{ marginTop: 8, padding: '0 20px' }}>
+            {showSignalInfo && (
+              <div
+                ref={popoverRef}
+                style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 8px)', left: 0, right: 0,
+                  zIndex: 10,
+                  background: TOKENS.bg1,
+                  border: `1px solid ${TOKENS.line2}`,
+                  borderRadius: 12,
+                  padding: '12px 14px',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                }}
+              >
+                <div style={{
+                  fontFamily: FONT, fontSize: 13, color: TOKENS.mute, lineHeight: 1.5,
+                }}>
+                  signalScore reflects activity across agent categories: posts, engagement, streaks, and retention. Updated daily.
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Stats row ──────────────────────────────────────────────────────── */}
+        <div style={{ marginTop: isAgentMode ? 18 : 8, padding: '0 20px' }}>
           <div style={{
-            display: 'grid', gridTemplateColumns: '1fr 1fr 1fr',
+            display: 'grid',
+            gridTemplateColumns: isAgentMode ? '1fr 1fr' : '1fr 1fr 1fr',
             background: 'rgba(255,255,255,0.02)',
             border: `1px solid ${TOKENS.line}`,
             borderRadius: 14,
             padding: '14px 0',
           }}>
-            {[
-              { label: 'FOLLOWING', value: user.following },
-              { label: 'FOLLOWERS', value: displayedFollowers },
-              { label: 'POSTS',     value: user.postCount },
-            ].map(({ label, value }, i) => (
+            {(isAgentMode
+              ? [
+                  { label: 'FOLLOWERS', value: agentDataReady ? fmtCompact(agentFollowers) : '—' },
+                  { label: 'POSTS',     value: agentDataReady ? fmtCompact(agentPostCount) : '—' },
+                ]
+              : [
+                  { label: 'FOLLOWING', value: user!.following.toLocaleString() },
+                  { label: 'FOLLOWERS', value: displayedFollowers.toLocaleString() },
+                  { label: 'POSTS',     value: user!.postCount.toLocaleString() },
+                ]
+            ).map(({ label, value }, i) => (
               <div
                 key={label}
                 style={{
@@ -478,7 +549,7 @@ export function UserProfileScreen() {
                 <div style={{
                   fontFamily: FONT, fontSize: 18, fontWeight: 700, color: TOKENS.text,
                 }}>
-                  {value.toLocaleString()}
+                  {value}
                 </div>
                 <div style={{
                   fontFamily: MONO, fontSize: 10, letterSpacing: 1.2, color: TOKENS.mute2,
@@ -491,58 +562,97 @@ export function UserProfileScreen() {
           </div>
         </div>
 
-        {/* ── Arenas badges ────────────────────────────────────────────────── */}
-        {visibleBadges.length > 0 && (
+        {/* ── Arenas ─────────────────────────────────────────────────────────── */}
+        {isAgentMode ? (
+          // Agent mode: single arena card — the agent's own category
           <div style={{ marginTop: 20, padding: '0 20px' }}>
             <div style={{
               fontFamily: MONO, fontSize: 10, letterSpacing: 1.4, color: TOKENS.mute2,
               marginBottom: 8,
             }}>ARENAS</div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {visibleBadges.map(badge => {
-                const A = AGENTS[badge.agent];
-                return (
-                  <div
-                    key={badge.agent}
-                    style={{
-                      padding: '12px 14px', borderRadius: 12,
-                      background: A.color + '10',
-                      border: `1px solid ${A.color + '33'}`,
-                      display: 'flex', alignItems: 'center', gap: 12,
-                    }}
-                  >
-                    <AgentDot agent={badge.agent} size={32} clickable={false} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{
-                        fontFamily: FONT, fontSize: 14, fontWeight: 600, color: TOKENS.text,
-                      }}>
-                        {badge.categoryName}
-                      </div>
-                      <div style={{
-                        fontFamily: FONT, fontSize: 11, color: TOKENS.mute, marginTop: 2,
-                      }}>
-                        Rank #{badge.rank} of {badge.total.toLocaleString()}
-                      </div>
-                    </div>
-                    {badge.rank <= 5 && (
-                      <span style={{
-                        padding: '3px 8px', borderRadius: 4,
-                        background: A.color + '26',
-                        color: A.color,
-                        fontFamily: MONO, fontSize: 8, letterSpacing: 1.2, fontWeight: 700,
-                      }}>
-                        CREATORS
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
+            <div
+              onClick={() => navigate(`/leaderboard/${agentIdLower}`)}
+              style={{
+                padding: '12px 14px', borderRadius: 12,
+                background: designAgent!.color + '10',
+                border: `1px solid ${designAgent!.color}33`,
+                display: 'flex', alignItems: 'center', gap: 12,
+                cursor: 'pointer',
+              }}
+            >
+              <AgentDot agent={agentId} size={32} clickable={false} />
+              <div style={{ flex: 1 }}>
+                <div style={{
+                  fontFamily: FONT, fontSize: 14, fontWeight: 600, color: TOKENS.text,
+                }}>
+                  {designAgent!.tag}
+                </div>
+                <div style={{
+                  fontFamily: FONT, fontSize: 11, color: TOKENS.mute, marginTop: 2,
+                }}>
+                  {fmtCompact(agentFollowers)} followers
+                </div>
+              </div>
+              <svg width="8" height="14" viewBox="0 0 8 14">
+                <path d="M1 1l6 6-6 6" stroke={TOKENS.mute3} strokeWidth="2" fill="none" strokeLinecap="round"/>
+              </svg>
             </div>
           </div>
+        ) : (
+          // User mode: top 3 arena badges (rank ≤ 100)
+          visibleBadges.length > 0 && (
+            <div style={{ marginTop: 20, padding: '0 20px' }}>
+              <div style={{
+                fontFamily: MONO, fontSize: 10, letterSpacing: 1.4, color: TOKENS.mute2,
+                marginBottom: 8,
+              }}>ARENAS</div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {visibleBadges.map(badge => {
+                  const A = DESIGN_AGENTS[badge.agent];
+                  return (
+                    <div
+                      key={badge.agent}
+                      style={{
+                        padding: '12px 14px', borderRadius: 12,
+                        background: A.color + '10',
+                        border: `1px solid ${A.color + '33'}`,
+                        display: 'flex', alignItems: 'center', gap: 12,
+                      }}
+                    >
+                      <AgentDot agent={badge.agent} size={32} clickable={false} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{
+                          fontFamily: FONT, fontSize: 14, fontWeight: 600, color: TOKENS.text,
+                        }}>
+                          {badge.categoryName}
+                        </div>
+                        <div style={{
+                          fontFamily: FONT, fontSize: 11, color: TOKENS.mute, marginTop: 2,
+                        }}>
+                          Rank #{badge.rank} of {badge.total.toLocaleString()}
+                        </div>
+                      </div>
+                      {badge.rank <= 5 && (
+                        <span style={{
+                          padding: '3px 8px', borderRadius: 4,
+                          background: A.color + '26',
+                          color: A.color,
+                          fontFamily: MONO, fontSize: 8, letterSpacing: 1.2, fontWeight: 700,
+                        }}>
+                          CREATORS
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )
         )}
 
-        {/* ── Post grid ────────────────────────────────────────────────────── */}
+        {/* ── Post grid ──────────────────────────────────────────────────────── */}
         <div style={{ marginTop: 24 }}>
           <div style={{
             fontFamily: MONO, fontSize: 10, letterSpacing: 1.4, color: TOKENS.mute2,
@@ -551,33 +661,68 @@ export function UserProfileScreen() {
             POSTS
           </div>
 
-          {user.postCount === 0 ? (
-            <div style={{
-              padding: '40px 20px', textAlign: 'center',
-              fontFamily: MONO, fontSize: 11, color: TOKENS.mute2, letterSpacing: 1.4,
-            }}>
-              NO POSTS YET
-            </div>
+          {isAgentMode ? (
+            agentPostsLoading ? (
+              <div style={{
+                padding: '40px 20px', textAlign: 'center',
+                fontFamily: MONO, fontSize: 11, color: TOKENS.mute2, letterSpacing: 1.4,
+              }}>
+                LOADING…
+              </div>
+            ) : agentPosts.length === 0 ? (
+              <div style={{
+                padding: '40px 20px', textAlign: 'center',
+                fontFamily: MONO, fontSize: 11, color: TOKENS.mute2, letterSpacing: 1.4,
+              }}>
+                NO POSTS YET
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 2,
+              }}>
+                {agentPosts.map((post, i) => (
+                  <div
+                    key={post.id}
+                    onClick={() => navigate('/post/' + post.id)}
+                    style={{ aspectRatio: '1 / 1', cursor: 'pointer', overflow: 'hidden' }}
+                  >
+                    <img
+                      src={post.imageUrl}
+                      alt=""
+                      loading={i < 6 ? 'eager' : 'lazy'}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    />
+                  </div>
+                ))}
+              </div>
+            )
           ) : (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: 2,
-            }}>
-              {posts.map(post => (
-                <div
-                  key={post.id}
-                  onClick={() => navigate('/post/' + post.id)}
-                  style={{
-                    aspectRatio: '1 / 1',
-                    backgroundImage: `url(${post.thumbnailUrl})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    cursor: 'pointer',
-                  }}
-                />
-              ))}
-            </div>
+            user!.postCount === 0 ? (
+              <div style={{
+                padding: '40px 20px', textAlign: 'center',
+                fontFamily: MONO, fontSize: 11, color: TOKENS.mute2, letterSpacing: 1.4,
+              }}>
+                NO POSTS YET
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 2,
+              }}>
+                {userPosts.map(post => (
+                  <div
+                    key={post.id}
+                    onClick={() => navigate('/post/' + post.id)}
+                    style={{
+                      aspectRatio: '1 / 1',
+                      backgroundImage: `url(${post.thumbnailUrl})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                      cursor: 'pointer',
+                    }}
+                  />
+                ))}
+              </div>
+            )
           )}
         </div>
 

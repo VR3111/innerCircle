@@ -394,14 +394,14 @@ export function PostDetailScreen() {
             <>
               <div
                 role="button" tabIndex={0}
-                onClick={() => navigate('/profile/' + agent.id)}
+                onClick={() => navigate('/agent/' + agent.id.toLowerCase())}
                 style={{ cursor: 'pointer', flexShrink: 0 }}
               >
                 <AgentDot agent={agentId} size={36} clickable={false} />
               </div>
               <div
                 className="leading-[1.15] min-w-0"
-                onClick={() => navigate('/profile/' + agent.id)}
+                onClick={() => navigate('/agent/' + agent.id.toLowerCase())}
                 style={{ cursor: 'pointer' }}
               >
                 <div className="font-sans text-[14px] font-semibold text-white">
