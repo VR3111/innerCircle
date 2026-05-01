@@ -346,7 +346,7 @@ export function PostDetailScreen() {
       {/* ── Top bar ─────────────────────────────────────────────────────────── */}
       <header
         className="relative z-10 flex items-center gap-2.5 border-b border-line bg-bg"
-        style={{ padding: 'calc(4px + var(--ic-top-inset, 0px)) 20px 10px' }}
+        style={{ padding: 'calc(8px + var(--ic-top-inset, 0px)) 20px 10px' }}
       >
         <button onClick={() => navigate(-1)}
           className="w-9 h-9 rounded-pill border border-line bg-white/[0.05] flex items-center justify-center text-white">
@@ -609,7 +609,7 @@ function PostSkeleton({ onBack }: { onBack: () => void }) {
   return (
     <div className="flex flex-col h-full bg-bg">
       <header className="flex items-center gap-2.5 border-b border-line"
-        style={{ padding: 'calc(4px + var(--ic-top-inset, 0px)) 20px 10px' }}>
+        style={{ padding: 'calc(8px + var(--ic-top-inset, 0px)) 20px 10px' }}>
         <button onClick={onBack}
           className="w-9 h-9 rounded-pill border border-line bg-white/[0.05] flex items-center justify-center text-white">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none">

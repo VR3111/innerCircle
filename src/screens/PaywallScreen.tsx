@@ -64,38 +64,19 @@ export function PaywallScreen() {
   };
 
   return (
-    // Full-screen scrollable container — entire page scrolls as one unit (per prototype).
-    // position:relative anchors the two absolutely-positioned ambient orbs.
+    // Fixed outer shell — flex column, no scroll. Header stays pinned; content scrolls below.
     <div
-      className="no-scrollbar"
       style={{
-        position: 'relative', height: '100%',
+        position: 'absolute', inset: 0,
         background: TOKENS.bg, display: 'flex', flexDirection: 'column',
-        overflowY: 'auto',
       }}
     >
-      {/* ── Ambient gold orbs ──────────────────────────────────────────────── */}
-      {/* Top-right orb — corner-positioned; ic-float-corner avoids centering transforms */}
-      <div style={{
-        position: 'absolute', top: -120, right: -60, width: 360, height: 360,
-        borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(212,175,55,0.28) 0%, transparent 70%)',
-        filter: 'blur(30px)', pointerEvents: 'none',
-        animation: 'ic-float-corner 9s ease-in-out infinite',
-      }}/>
-      {/* Bottom-left orb — static, no animation */}
-      <div style={{
-        position: 'absolute', bottom: -100, left: -80, width: 380, height: 380,
-        borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(212,175,55,0.16) 0%, transparent 70%)',
-        filter: 'blur(40px)', pointerEvents: 'none',
-      }}/>
-
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      {/* ── Header (non-scrolling) ─────────────────────────────────────────── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: 'calc(6px + var(--ic-top-inset, 0px)) 18px 8px',
+        padding: 'calc(8px + var(--ic-top-inset, 0px)) 18px 8px',
         position: 'relative',
+        flexShrink: 0,
       }}>
         <button onClick={() => navigate(-1)} style={iconBtnStyle} aria-label="Back">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
@@ -111,7 +92,32 @@ export function PaywallScreen() {
         <div style={{ width: 36 }}/>
       </div>
 
-      {/* ── Branding: animated mark + headline + subtext ───────────────────── */}
+      {/* ── Scrollable content ─────────────────────────────────────────────── */}
+      <div
+        className="no-scrollbar"
+        style={{
+          flex: 1, overflowY: 'auto', overflowX: 'hidden',
+          position: 'relative',
+        }}
+      >
+        {/* ── Ambient gold orbs ────────────────────────────────────────────── */}
+        {/* Top-right orb — corner-positioned; ic-float-corner avoids centering transforms */}
+        <div style={{
+          position: 'absolute', top: -120, right: -60, width: 360, height: 360,
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(212,175,55,0.28) 0%, transparent 70%)',
+          filter: 'blur(30px)', pointerEvents: 'none',
+          animation: 'ic-float-corner 9s ease-in-out infinite',
+        }}/>
+        {/* Bottom-left orb — static, no animation */}
+        <div style={{
+          position: 'absolute', bottom: -100, left: -80, width: 380, height: 380,
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(212,175,55,0.16) 0%, transparent 70%)',
+          filter: 'blur(40px)', pointerEvents: 'none',
+        }}/>
+
+        {/* ── Branding: animated mark + headline + subtext ─────────────────── */}
       <div style={{ padding: '18px 28px 10px', textAlign: 'center', position: 'relative' }}>
         {/* SLMark with pulsing glow halo */}
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
@@ -268,6 +274,7 @@ export function PaywallScreen() {
         }}>7-DAY FREE TRIAL · CANCEL ANYTIME</div>
       </div>
 
+      </div>{/* end scroll wrapper */}
     </div>
   );
 }
