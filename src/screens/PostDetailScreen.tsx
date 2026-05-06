@@ -189,6 +189,11 @@ export function PostDetailScreen() {
     const vv = window.visualViewport;
     if (!vv) return;
     const onResize = () => {
+      // Counteract Chrome iOS's document-level scroll-to-focused-input when keyboard opens.
+      // Safari iOS doesn't scroll (no-op there); Chrome iOS does (this resets it).
+      if (vv.height < window.innerHeight - 1) {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      }
       if (!composerRef.current) return;
       const offset = Math.max(0, window.innerHeight - vv.offsetTop - vv.height);
       composerRef.current.style.bottom = `${offset}px`;
