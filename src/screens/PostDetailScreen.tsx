@@ -6,6 +6,7 @@
 import { useNavigate, useParams, useLocation } from 'react-router';
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
+import { Capacitor } from '@capacitor/core';
 import { AGENTS, AGENT_ORDER, TOKENS, type AgentId } from '@/lib/design-tokens';
 import { AgentDot, Odometer, PlaceholderImg, fmtCompact } from '@/components/primitives';
 import type { Reply as ScaffoldReply } from '@/lib/types';
@@ -179,8 +180,12 @@ export function PostDetailScreen() {
     return () => clearTimeout(t);
   }, [locationState?.scrollToComments, postLoading]);
 
-  // visualViewport keyboard avoidance
+  // Keyboard avoidance: lift composer above the keyboard (web only).
+  // On native iOS, resize:'native' shrinks the WKWebView so bottom:0 is
+  // automatically above the keyboard — no JS adjustment needed.
   useEffect(() => {
+    if (Capacitor.isNativePlatform()) return;
+
     const vv = window.visualViewport;
     if (!vv) return;
     const onResize = () => {

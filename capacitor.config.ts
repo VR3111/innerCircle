@@ -21,6 +21,9 @@ const config: CapacitorConfig = {
       // CSS changes. Switching to false would shift the WebView frame.
       overlaysWebView: true,
     },
+    Keyboard: {
+      resize: 'native',
+    },
   },
 }
 
