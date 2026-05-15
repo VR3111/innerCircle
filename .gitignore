@@ -27,3 +27,5 @@ ios/.DS_Store
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+.vercel
+.env*.local

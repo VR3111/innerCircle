@@ -4,7 +4,7 @@
 //                                               Set to 'false' to disable all agent replies.
 //                                               Defaults to enabled when missing.
 //
-//   AGENT_REPLIES_DAILY_COST_LIMIT_CENTS=2000   Hard daily spend ceiling in cents ($20.00).
+//   AGENT_REPLIES_DAILY_COST_LIMIT_CENTS=4000   Hard daily spend ceiling in cents ($40.00).
 //                                               Resets at UTC midnight via the daily_spend table.
 //                                               Defaults to 2000 when missing.
 //
@@ -13,6 +13,8 @@
 //                                               Defaults to 20 when missing.
 
 import { getSupabaseAdmin } from './_lib/supabase-admin'
+import { callClaudeAPI, computeCostCents } from './_lib/call-claude'
+import { getTodaySpendCents, incrementTodaySpendCents } from './_lib/daily-spend'
 import {
   AGENT_PROFILE_IDS,
   AGENT_NAMES,
@@ -20,13 +22,10 @@ import {
   AGENT_REPLIES_PER_USER_PER_POST_LIMIT,
   AGENT_REPLY_MAX_TOKENS,
 } from './_agents/constants'
-import { AGENT_PROMPTS } from './_agents/prompts'
+import { AGENT_PERSONALITIES } from './_agents/personalities'
 
 // Give Claude + web search enough runway. Vercel Hobby cap is 60s.
 export const config = { maxDuration: 45 }
-
-const CLAUDE_MODEL   = 'claude-sonnet-4-5'
-const CLAUDE_API_URL = 'https://api.anthropic.com/v1/messages'
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -101,16 +100,6 @@ async function validateAuth(token: string, userId: string): Promise<boolean> {
 
 // ── Text helpers ───────────────────────────────────────────────
 
-// When web_search is used, Claude's response contains tool_use,
-// tool_result, and text blocks. We only want the text blocks.
-function extractTextBlocks(content: { type: string; text?: string }[]): string {
-  return content
-    .filter(block => block.type === 'text' && typeof block.text === 'string')
-    .map(block => block.text as string)
-    .join(' ')
-    .trim()
-}
-
 function stripMarkdownFences(text: string): string {
   return text
     .replace(/^```(?:\w+)?\s*/i, '')
@@ -137,7 +126,7 @@ function sanitizeReply(text: string): string {
 }
 
 // ── Claude API call ────────────────────────────────────────────
-// Uses raw fetch consistent with api/_lib/claude.ts.
+// Uses the shared callClaudeAPI utility.
 // Web search (web_search_20250305) is a server-side Anthropic-hosted
 // tool — Anthropic executes searches internally; we do not need to
 // implement a tool loop. The response arrives with stop_reason: 'end_turn'
@@ -147,12 +136,9 @@ async function callClaude(
   agentName: string,
   mode: ReplyMode,
   context?: { postHeadline: string; postBody: string; userComment: string; isFinalReply?: boolean },
-): Promise<string> {
-  const key = process.env.ANTHROPIC_API_KEY
-  if (!key) throw new Error('Missing ANTHROPIC_API_KEY')
-
-  const systemPrompt = AGENT_PROMPTS[agentName]
-  if (!systemPrompt) throw new Error(`No system prompt for agent: ${agentName}`)
+): Promise<{ text: string; costCents: number }> {
+  const personality = AGENT_PERSONALITIES[agentName]
+  if (!personality) throw new Error(`No personality for agent: ${agentName}`)
 
   let userMessage: string
   let tools: object[] | undefined
@@ -187,32 +173,17 @@ async function callClaude(
     tools = [{ type: 'web_search_20250305', name: 'web_search' }]
   }
 
-  const requestBody: Record<string, unknown> = {
-    model:      CLAUDE_MODEL,
-    max_tokens: AGENT_REPLY_MAX_TOKENS,
-    system:     systemPrompt,
-    messages:   [{ role: 'user', content: userMessage }],
-  }
-  if (tools) requestBody.tools = tools
-
-  const res = await fetch(CLAUDE_API_URL, {
-    method:  'POST',
-    headers: {
-      'x-api-key':         key,
-      'anthropic-version': '2023-06-01',
-      'content-type':      'application/json',
-    },
-    body: JSON.stringify(requestBody),
+  const response = await callClaudeAPI({
+    systemPrompt: personality.replySystemPrompt,
+    maxTokens:    AGENT_REPLY_MAX_TOKENS,
+    userMessage,
+    tools,
   })
 
-  if (!res.ok) {
-    const errText = await res.text()
-    throw new Error(`Claude API ${res.status}: ${errText}`)
-  }
+  const text = sanitizeReply(response.text) || FALLBACK_REPLIES[agentName] || 'Technical error. Please try again.'
+  const costCents = computeCostCents(response.usage)
 
-  const data = await res.json() as { content: { type: string; text?: string }[] }
-  const raw  = extractTextBlocks(data.content)
-  return sanitizeReply(raw) || FALLBACK_REPLIES[agentName] || 'Technical error. Please try again.'
+  return { text, costCents }
 }
 
 // ── DB helpers ─────────────────────────────────────────────────
@@ -324,30 +295,6 @@ async function insertAgentReply(params: {
 
   if (error) throw new Error(`insertAgentReply: ${error.message}`)
   return data
-}
-
-// ── Daily spend helpers ────────────────────────────────────────
-
-// Returns today's estimated spend in cents (UTC day boundary).
-async function getTodaySpendCents(): Promise<number> {
-  const today = new Date().toISOString().split('T')[0]  // 'YYYY-MM-DD' UTC
-  const { data } = await getSupabaseAdmin()
-    .from('daily_spend')
-    .select('estimated_cost_cents')
-    .eq('date', today)
-    .maybeSingle()
-  return data?.estimated_cost_cents ?? 0
-}
-
-// Atomically increments both reply count and cost for today.
-// Uses the increment_daily_spend Postgres function (migration 011)
-// to avoid a read-modify-write race under concurrent requests.
-async function incrementTodaySpendCents(cents: number): Promise<void> {
-  const today = new Date().toISOString().split('T')[0]
-  await getSupabaseAdmin().rpc('increment_daily_spend', {
-    p_date:  today,
-    p_cents: cents,
-  })
 }
 
 // ── Per-user rolling-24h cap helper ───────────────────────────
@@ -484,7 +431,7 @@ export default async function handler(req: any, res: any) {
     const topLevelParentId = await resolveTopLevelParent(userReplyId!)
 
     // ── 9. Daily cost ceiling check ────────────────────────────
-    const dailyLimit = parseInt(process.env.AGENT_REPLIES_DAILY_COST_LIMIT_CENTS ?? '2000', 10)
+    const dailyLimit = parseInt(process.env.AGENT_REPLIES_DAILY_COST_LIMIT_CENTS ?? '4000', 10)
     const todaySpend = await getTodaySpendCents()
     if (todaySpend >= dailyLimit) {
       console.log(`[agent-reply] Daily cost limit hit: ${todaySpend}/${dailyLimit} cents`)
@@ -530,7 +477,7 @@ export default async function handler(req: any, res: any) {
         } as AgentReplyResponse)
       }
       // Generate the first (and only) pinned cap-hit for this post
-      const capText = await callClaude(taggedAgent!, 'cap_hit')
+      const { text: capText, costCents: capCost } = await callClaude(taggedAgent!, 'cap_hit')
       const row     = await insertAgentReply({
         postId:           postId!,
         topLevelParentId: topLevelParentId,
@@ -538,7 +485,7 @@ export default async function handler(req: any, res: any) {
         content:          capText,
         isPinned:         true,
       })
-      await incrementTodaySpendCents(2)
+      await incrementTodaySpendCents(capCost)
       return res.status(200).json({
         success:      true,
         replyId:      row.id,
@@ -565,7 +512,7 @@ export default async function handler(req: any, res: any) {
     // isFinalAllowedReply: userCount is currently 4, meaning THIS reply is the
     // 5th (allowed). The 6th would be a cap hit, so we prompt a natural close.
     const isFinalAllowedReply = userCount === AGENT_REPLIES_PER_USER_PER_POST_LIMIT - 1
-    const replyText = await callClaude(taggedAgent!, 'normal', {
+    const { text: replyText, costCents: replyCost } = await callClaude(taggedAgent!, 'normal', {
       postHeadline:  postHeadline!,
       postBody:      postBody!,
       userComment:   userReplyContent!,
@@ -578,7 +525,7 @@ export default async function handler(req: any, res: any) {
       content:          replyText,
       isPinned:         false,
     })
-    await incrementTodaySpendCents(2)
+    await incrementTodaySpendCents(replyCost)
 
     console.log(`[agent-reply] Posted reply ${row.id} for agent=${taggedAgent} post=${postId}`)
 

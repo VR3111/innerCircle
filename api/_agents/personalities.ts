@@ -1,14 +1,53 @@
-// ── Agent system prompts ──────────────────────────────────────
+// ── Unified agent personality module ──────────────────────────
 //
-// Used by api/agent-reply.ts (Chunk B) as the system prompt
-// when calling Claude to generate a reply on behalf of an agent.
+// Single source of truth for every agent's identity, voice, and
+// output rules. Both pipelines (post generation + agent replies)
+// read from this file.
 //
-// Each prompt follows the [IDENTITY] / [VOICE] / [OUTPUT RULES] /
-// [WEB SEARCH] / [OFF-TOPIC REFUSAL] / [CAP-HIT GOODBYE] structure.
+// To change an agent's voice, edit ONLY this file.
 
-export const AGENT_PROMPTS: Record<string, string> = {
+export interface AgentPersonality {
+  id:                  string      // slug: 'baron', 'blitz', etc.
+  name:                string      // display name: 'Baron', 'Blitz', etc.
+  newsQuery:           string      // NewsAPI query string (post generation)
+  imageKeywords:       string[]    // Unsplash search terms (post generation)
+  replySystemPrompt:   string      // FULL system prompt for reply pipeline
+  postGenerationRules: string      // post-specific output format rules
+}
 
-  baron: `[IDENTITY]
+// ── Shared post-generation output rules ─────────────────────
+// Identical across all agents. Appended after identity+voice
+// when building the post-generation system prompt.
+
+const POST_GENERATION_RULES = `You write short, punchy social media posts. Choose one story from the news provided and write a post about it.
+
+Respond with ONLY a valid JSON object — no markdown, no code fences, no explanation:
+{
+  "headline": "A bold punchy title, maximum 12 words",
+  "body": "2-3 sentences in your distinct voice. No hashtags. No emojis."
+}`
+
+// ── Helper: extract identity + voice for post generation ────
+// Splits the reply prompt at [OUTPUT RULES] and returns
+// everything before it (the [IDENTITY] and [VOICE] sections).
+
+export function getIdentityAndVoice(personality: AgentPersonality): string {
+  const marker = '\n\n[OUTPUT RULES]'
+  const idx = personality.replySystemPrompt.indexOf(marker)
+  return idx >= 0 ? personality.replySystemPrompt.slice(0, idx) : personality.replySystemPrompt
+}
+
+// ── Personalities ────────────────────────────────────────────
+
+export const AGENT_PERSONALITIES: Record<string, AgentPersonality> = {
+
+  baron: {
+    id:   'baron',
+    name: 'Baron',
+    newsQuery:     'stock market finance economy federal reserve inflation interest rates',
+    imageKeywords: ['finance', 'stock market', 'wall street', 'trading', 'economy'],
+    postGenerationRules: POST_GENERATION_RULES,
+    replySystemPrompt: `[IDENTITY]
 You are Baron. You cover finance, markets, economics, and investing. You have spent two decades watching the same panics cycle through the same uninformed crowd, and you have been right every time. Your philosophy: markets are a chess game, most participants are playing checkers, and volatility is just opportunity wearing a frightening costume.
 
 [VOICE]
@@ -54,8 +93,15 @@ When instructed to generate a cap-hit message (meaning the user has hit their re
 - "Goodbye. The spread isn't going to watch itself."
 
 Rule: Every cap-hit message must be freshly written.`,
+  },
 
-  blitz: `[IDENTITY]
+  blitz: {
+    id:   'blitz',
+    name: 'Blitz',
+    newsQuery:     'sports NFL NBA soccer football',
+    imageKeywords: ['sports', 'basketball', 'football', 'athlete', 'stadium'],
+    postGenerationRules: POST_GENERATION_RULES,
+    replySystemPrompt: `[IDENTITY]
 You are Blitz. You cover sports — NFL, NBA, MLB, soccer, tennis, MMA, the Olympics, anything with a scoreboard and a crowd. You came up calling minor-league games in towns nobody's heard of and you have never once lowered your voice. Your philosophy: every game is the biggest game, every play could change a season, and if you're not feeling it you're not paying attention.
 
 [VOICE]
@@ -101,8 +147,15 @@ When instructed to generate a cap-hit message (meaning the user has hit their re
 - "Time's up. Great set. Go hydrate."
 
 Rule: Every cap-hit message must be freshly written.`,
+  },
 
-  circuit: `[IDENTITY]
+  circuit: {
+    id:   'circuit',
+    name: 'Circuit',
+    newsQuery:     'technology AI startup silicon valley software hardware innovation',
+    imageKeywords: ['technology', 'artificial intelligence', 'computer', 'silicon valley', 'startup'],
+    postGenerationRules: POST_GENERATION_RULES,
+    replySystemPrompt: `[IDENTITY]
 You are Circuit. You cover technology — AI, software, hardware, semiconductors, startups, and the relentless hype cycle that precedes most failures. You have watched five generations of "the next big thing" collapse into cautionary tales and one or two genuine revolutions. Your philosophy: real innovation is quiet and then suddenly obvious; everything else is a pitch deck with good lighting and a waitlist.
 
 [VOICE]
@@ -148,8 +201,15 @@ When instructed to generate a cap-hit message (meaning the user has hit their re
 - "Allocation used. Come back with a real question."
 
 Rule: Every cap-hit message must be freshly written.`,
+  },
 
-  reel: `[IDENTITY]
+  reel: {
+    id:   'reel',
+    name: 'Reel',
+    newsQuery:     'movies celebrity entertainment hollywood music awards streaming',
+    imageKeywords: ['cinema', 'entertainment', 'hollywood', 'music', 'celebrity'],
+    postGenerationRules: POST_GENERATION_RULES,
+    replySystemPrompt: `[IDENTITY]
 You are Reel. You cover entertainment — film, television, music, celebrity, awards season, streaming, and the full spectacular excess of pop culture. You have never held a moderate opinion in your life. Your philosophy: everything is either a masterpiece or a catastrophe, the only true crime is mediocrity, and the only crime worse than that is pretending you can't tell the difference.
 
 [VOICE]
@@ -195,8 +255,15 @@ When instructed to generate a cap-hit message (meaning the user has hit their re
 - "The theater is closing. I hope you enjoyed the show."
 
 Rule: Every cap-hit message must be freshly written.`,
+  },
 
-  pulse: `[IDENTITY]
+  pulse: {
+    id:   'pulse',
+    name: 'Pulse',
+    newsQuery:     'fitness health nutrition exercise science wellness longevity',
+    imageKeywords: ['fitness', 'exercise', 'gym', 'running', 'health'],
+    postGenerationRules: POST_GENERATION_RULES,
+    replySystemPrompt: `[IDENTITY]
 You are Pulse. You cover fitness, nutrition, training methodology, health science, and the endless parade of misinformation that passes for wellness advice. You have a background in exercise physiology, you read the studies before you cite them, and you are completely out of patience for shortcuts. Your philosophy: the body responds to stimulus and recovery — not supplements, not cleanses, not anything being sold on a podcast.
 
 [VOICE]
@@ -242,8 +309,15 @@ When instructed to generate a cap-hit message (meaning the user has hit their re
 - "Session closed. The work was solid. See you next time."
 
 Rule: Every cap-hit message must be freshly written.`,
+  },
 
-  atlas: `[IDENTITY]
+  atlas: {
+    id:   'atlas',
+    name: 'Atlas',
+    newsQuery:     'politics world news geopolitics government policy elections international',
+    imageKeywords: ['politics', 'government', 'world news', 'geopolitics', 'capitol'],
+    postGenerationRules: POST_GENERATION_RULES,
+    replySystemPrompt: `[IDENTITY]
 You are Atlas. You cover politics, geopolitics, elections, policy, international relations, and the power structures that sit beneath every public narrative. You have no ideology and no party. You have the historical record, an understanding of incentive structures, and a precise grasp of who benefits from what. Your philosophy: all political events are downstream of incentives, and most political commentary ignores the incentives entirely.
 
 [VOICE]
@@ -289,5 +363,6 @@ When instructed to generate a cap-hit message (meaning the user has hit their re
 - "We're finished here. Watch what happens next."
 
 Rule: Every cap-hit message must be freshly written.`,
+  },
 
 }

@@ -1,20 +1,17 @@
-import { baron }   from './_agents/baron'
-import { blitz }   from './_agents/blitz'
-import { circuit } from './_agents/circuit'
-import { reel }    from './_agents/reel'
-import { pulse }   from './_agents/pulse'
-import { atlas }   from './_agents/atlas'
-import { fetchTopHeadlines } from './_lib/newsapi'
-import { generatePost }      from './_lib/claude'
-import { fetchImage }        from './_lib/unsplash'
-import { getSupabaseAdmin }  from './_lib/supabase-admin'
-import type { AgentConfig }  from './_agents/types'
+import { AGENT_PERSONALITIES, type AgentPersonality } from './_agents/personalities'
+import { AGENT_NAMES }           from './_agents/constants'
+import { fetchTopHeadlines }     from './_lib/newsapi'
+import { generatePost }          from './_lib/claude'
+import { fetchImage }            from './_lib/unsplash'
+import { getSupabaseAdmin }      from './_lib/supabase-admin'
+import { computeCostCents }      from './_lib/call-claude'
+import { incrementTodaySpendCents } from './_lib/daily-spend'
 
 // Tell Vercel to use Node.js runtime and allow up to 60s (Hobby plan max).
 // Without maxDuration the default is 10s — not enough for 6 sequential agents.
 export const config = { maxDuration: 60 }
 
-const ALL_AGENTS = [baron, blitz, circuit, reel, pulse, atlas]
+const ALL_AGENTS = AGENT_NAMES.map(name => AGENT_PERSONALITIES[name])
 
 // Minimum hours between posts per agent (prevents spam on manual re-runs)
 const MIN_HOURS_BETWEEN_POSTS = 5
@@ -38,31 +35,35 @@ async function hasRecentPost(agentId: string): Promise<boolean> {
   return (data?.length ?? 0) > 0
 }
 
-async function runAgent(config: AgentConfig): Promise<AgentResult> {
+async function runAgent(personality: AgentPersonality): Promise<AgentResult> {
   try {
     // 1. Deduplication guard
-    const alreadyPosted = await hasRecentPost(config.id)
+    const alreadyPosted = await hasRecentPost(personality.id)
     if (alreadyPosted) {
-      return { agent: config.id, status: 'skipped', reason: `Posted within last ${MIN_HOURS_BETWEEN_POSTS}h` }
+      return { agent: personality.id, status: 'skipped', reason: `Posted within last ${MIN_HOURS_BETWEEN_POSTS}h` }
     }
 
     // 2. Fetch news headlines
-    const articles = await fetchTopHeadlines(config.newsQuery)
+    const articles = await fetchTopHeadlines(personality.newsQuery)
     if (articles.length === 0) {
-      return { agent: config.id, status: 'error', reason: 'No news articles returned' }
+      return { agent: personality.id, status: 'error', reason: 'No news articles returned' }
     }
 
     // 3. Generate post with Claude
-    const { headline, body } = await generatePost(config.name, config.personality, articles)
+    const { headline, body, usage } = await generatePost(personality, articles)
 
-    // 4. Fetch image from Unsplash (non-fatal if it fails)
-    const imageUrl = await fetchImage(config.imageKeywords)
+    // 4. Track cost in daily_spend
+    const costCents = computeCostCents(usage)
+    await incrementTodaySpendCents(costCents)
 
-    // 5. Insert post into Supabase
+    // 5. Fetch image from Unsplash (non-fatal if it fails)
+    const imageUrl = await fetchImage(personality.imageKeywords)
+
+    // 6. Insert post into Supabase
     const { data, error } = await getSupabaseAdmin()
       .from('posts')
       .insert({
-        agent_id:  config.id,
+        agent_id:  personality.id,
         headline,
         body,
         image_url: imageUrl,
@@ -71,19 +72,19 @@ async function runAgent(config: AgentConfig): Promise<AgentResult> {
       .single()
 
     if (error) {
-      return { agent: config.id, status: 'error', reason: `DB insert failed: ${error.message}` }
+      return { agent: personality.id, status: 'error', reason: `DB insert failed: ${error.message}` }
     }
 
     return {
-      agent:    config.id,
+      agent:    personality.id,
       status:   'posted',
       postId:   data.id,
       headline,
     }
   } catch (err: any) {
     const reason = err?.message ?? String(err)
-    console.error(`[generate-posts] ${config.id} error:`, reason)
-    return { agent: config.id, status: 'error', reason }
+    console.error(`[generate-posts] ${personality.id} error:`, reason)
+    return { agent: personality.id, status: 'error', reason }
   }
 }
 
@@ -91,6 +92,13 @@ async function runAgent(config: AgentConfig): Promise<AgentResult> {
 
 export default async function handler(req: any, res: any) {
   console.log('Handler started')
+
+  // ── Kill switch — cheapest possible check, no DB or auth ──
+  // Explicit 'false' string only; missing var defaults to enabled.
+  if (process.env.POST_GENERATION_ENABLED === 'false') {
+    return res.status(200).json({ message: 'Post generation disabled' })
+  }
+
   try {
     // Verify caller is Vercel Cron or an authorized manual trigger
     const auth           = (req.headers['authorization'] ?? '') as string
