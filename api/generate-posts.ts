@@ -4,7 +4,7 @@ import { generatePost, type PostCandidate } from './_lib/claude'
 import { fetchImage }            from './_lib/unsplash'
 import { getSupabaseAdmin }      from './_lib/supabase-admin'
 import { computeCostCents }      from './_lib/call-claude'
-import { incrementTodaySpendCents } from './_lib/daily-spend'
+import { getTodaySpendCents, incrementTodaySpendCents } from './_lib/daily-spend'
 
 // Tell Vercel to use Node.js runtime and allow up to 60s (Hobby plan max).
 export const config = { maxDuration: 60 }
@@ -74,12 +74,16 @@ async function logCandidates(
   }
 }
 
-async function runAgent(personality: AgentPersonality): Promise<AgentResult> {
+async function runAgent(personality: AgentPersonality, force: boolean): Promise<AgentResult> {
   try {
-    // 1. Deduplication guard
-    const alreadyPosted = await hasRecentPost(personality.id)
-    if (alreadyPosted) {
-      return { agent: personality.id, status: 'skipped', reason: `Posted within last ${MIN_HOURS_BETWEEN_POSTS}h` }
+    // 1. Deduplication guard (bypassed in force mode)
+    if (!force) {
+      const alreadyPosted = await hasRecentPost(personality.id)
+      if (alreadyPosted) {
+        return { agent: personality.id, status: 'skipped', reason: `Posted within last ${MIN_HOURS_BETWEEN_POSTS}h` }
+      }
+    } else {
+      console.log(`[generate-posts] FORCE MODE: skipping 5-hour recent-post guard for ${personality.id}`)
     }
 
     // 2. Fetch recent headlines for dedup memory
@@ -185,12 +189,37 @@ export default async function handler(req: any, res: any) {
       return res.status(405).json({ error: 'Method not allowed' })
     }
 
+    // ── Pre-flight daily cost cap ──────────────────────────────
+    // Reads the SHARED daily_spend counter (same one agent-reply.ts
+    // gates on). Posts and replies are NOT independent budgets —
+    // they share one counter. This env var is separately tunable so
+    // the post-generation threshold can differ from the reply
+    // threshold, but the underlying spend total is combined.
+    const postCapCents = parseInt(process.env.POST_GENERATION_DAILY_COST_LIMIT_CENTS ?? '1000', 10)
+    const todaySpend   = await getTodaySpendCents()
+    if (todaySpend >= postCapCents) {
+      console.log(`[generate-posts] Daily spend cap reached: ${todaySpend}/${postCapCents} cents — skipping all agents`)
+      return res.status(200).json({ skipped: true, reason: 'Daily spend cap reached', spendCents: todaySpend, capCents: postCapCents })
+    }
+
+    // ── Force mode ─────────────────────────────────────────────
+    // Opt-in per-request bypass of the 5-hour recent-post guard.
+    // Requires the same auth as normal invocation (cron secret).
+    // Does NOT bypass: kill switch, cost cap, refuse-to-post, or
+    // prompt-level topic dedup. Only the time-based dedup.
+    // Accepts query param or header (header survives Vercel
+    // Deployment Protection redirects that may strip query strings).
+    const force = req.query?.force === 'true' || req.headers['x-force-post'] === 'true'
+    if (force) {
+      console.log('[generate-posts] FORCE MODE activated — 5-hour recent-post guard will be bypassed')
+    }
+
     const startedAt = Date.now()
 
     // Run agents in parallel — web_search is Anthropic-hosted (server-side),
     // no external rate limit to respect on our side. 6 concurrent requests
     // is well within Anthropic API limits.
-    const settled = await Promise.allSettled(ALL_AGENTS.map(runAgent))
+    const settled = await Promise.allSettled(ALL_AGENTS.map(agent => runAgent(agent, force)))
 
     const results: AgentResult[] = settled.map((outcome, i) => {
       if (outcome.status === 'fulfilled') return outcome.value
