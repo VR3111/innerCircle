@@ -32,6 +32,55 @@ interface ClaudePostResponse {
   post:                 { headline: string; body: string } | null
 }
 
+// ── JSON extraction ──────────────────────────────────────────
+// Claude may emit conversational preamble around the JSON when
+// web_search is enabled. This function robustly extracts JSON
+// from various response shapes.
+
+function extractJSON(raw: string): string {
+  const trimmed = raw.trim()
+
+  // 1. Starts with { — likely raw JSON, try directly
+  if (trimmed.startsWith('{')) {
+    return trimmed
+  }
+
+  // 2. Look for a ```json ... ``` fenced block anywhere
+  const fenceMatch = trimmed.match(/```json\s*\n?([\s\S]*?)\n?\s*```/)
+  if (fenceMatch) {
+    return fenceMatch[1].trim()
+  }
+
+  // 3. Bare ``` ... ``` fence (no language tag) if content looks like JSON
+  const bareFenceMatch = trimmed.match(/```\s*\n?([\s\S]*?)\n?\s*```/)
+  if (bareFenceMatch && bareFenceMatch[1].trim().startsWith('{')) {
+    return bareFenceMatch[1].trim()
+  }
+
+  // 4. Fallback: find outermost balanced { ... }, string-aware.
+  //    Tracks whether we're inside a JSON string to avoid miscounting
+  //    braces that appear inside string values (e.g. prose fields).
+  const firstBrace = trimmed.indexOf('{')
+  if (firstBrace >= 0) {
+    let depth = 0
+    let inString = false
+    for (let i = firstBrace; i < trimmed.length; i++) {
+      const ch = trimmed[i]
+      if (inString) {
+        if (ch === '\\') { i++; continue }  // skip escaped char
+        if (ch === '"') inString = false
+      } else {
+        if (ch === '"') inString = true
+        else if (ch === '{') depth++
+        else if (ch === '}') { depth--; if (depth === 0) return trimmed.slice(firstBrace, i + 1) }
+      }
+    }
+  }
+
+  // 5. Nothing worked — return raw so JSON.parse fails with full context
+  return trimmed
+}
+
 // ── Post generation ──────────────────────────────────────────
 // Builds the full system prompt from personality fields, injects
 // recent-post memory for dedup, enables web_search, and parses
@@ -76,12 +125,11 @@ export async function generatePost(
     tools:       [{ type: 'web_search_20250305', name: 'web_search' }],
   })
 
-  // Strip markdown code fences if Claude wraps the JSON despite instructions
-  const cleaned = response.text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+  const extracted = extractJSON(response.text)
 
   let parsed: ClaudePostResponse
   try {
-    parsed = JSON.parse(cleaned)
+    parsed = JSON.parse(extracted)
   } catch {
     throw new Error(`Claude returned non-JSON: ${response.text}`)
   }

@@ -22,7 +22,9 @@ export interface AgentPersonality {
 // Identical across all agents today, but lives on each personality
 // object so it can diverge per-agent later without code changes.
 
-const POST_GENERATION_OUTPUT_FORMAT = `Respond with ONLY a valid JSON object — no markdown, no code fences, no explanation:
+const POST_GENERATION_OUTPUT_FORMAT = `CRITICAL: Your entire response must be ONLY the JSON object below. Do not include any text, explanation, or commentary before or after the JSON. Start your response with { and end with }.
+
+Respond with ONLY a valid JSON object — no markdown, no code fences, no explanation:
 {
   "candidates": [
     {
