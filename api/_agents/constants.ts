@@ -25,4 +25,4 @@ export const AGENT_REPLIES_PER_POST_LIMIT = 30
 export const AGENT_REPLIES_PER_USER_PER_POST_LIMIT = 5
 
 // Claude max_tokens budget for a single agent reply
-export const AGENT_REPLY_MAX_TOKENS = 200
+export const AGENT_REPLY_MAX_TOKENS = 400

@@ -107,22 +107,89 @@ function stripMarkdownFences(text: string): string {
     .trim()
 }
 
-// Trim at the last sentence boundary before `max` chars.
-// Ensures we never ship a mid-sentence reply.
-function trimAtSentenceBoundary(text: string, max = 600): string {
+// ── Sentence-boundary guard ───────────────────────────────────
+// Guarantees: user sees either (a) a naturally complete reply,
+// (b) a reply trimmed to a real sentence boundary, or (c) a reply
+// trimmed to a whole word with trailing '…'. Never mid-word garbage.
+
+const ABBREV_SET = new Set([
+  'u.s', 'u.k', 'u.n', 'inc', 'corp', 'ltd', 'vs', 'jr', 'sr',
+  'mr', 'mrs', 'ms', 'dr', 'q1', 'q2', 'q3', 'q4', 'a.m', 'p.m',
+])
+
+function isUnambiguousSentenceEnd(text: string, punctIdx: number): boolean {
+  // The punctuation at punctIdx must be followed by whitespace (or be end-of-text
+  // handled by Tier 1). We only call this for mid-text boundaries.
+  const nextChar = text[punctIdx + 1]
+  if (!nextChar || !/\s/.test(nextChar)) return false
+
+  // Rule out digit immediately before punctuation (decimals: "4.55 ")
+  if (punctIdx > 0 && /\d/.test(text[punctIdx - 1])) return false
+
+  // Rule out single uppercase letter before punctuation ("U. S. ")
+  if (punctIdx >= 1 && /^[A-Z]$/.test(text[punctIdx - 1])) {
+    // Check if it's a lone letter (start of text or preceded by space/period)
+    if (punctIdx === 1 || /[\s.]/.test(text[punctIdx - 2])) return false
+  }
+
+  // Rule out known abbreviations: look back from punctIdx to find the word
+  const before = text.slice(Math.max(0, punctIdx - 10), punctIdx)
+  const wordMatch = before.match(/([A-Za-z.]+)$/)
+  if (wordMatch) {
+    const candidate = wordMatch[1].toLowerCase().replace(/\.$/, '')
+    if (ABBREV_SET.has(candidate)) return false
+  }
+
+  return true
+}
+
+function trimToCharLimit(text: string, max = 600): string {
   if (text.length <= max) return text
   const candidate = text.slice(0, max)
-  let   best      = -1
-  for (const end of ['. ', '! ', '? ', '." ', '." ']) {
-    const idx = candidate.lastIndexOf(end)
-    if (idx > best) best = idx + end.length - 1
+  // Find last unambiguous sentence boundary within the char limit
+  let best = -1
+  for (let i = candidate.length - 1; i >= 0; i--) {
+    if ((candidate[i] === '.' || candidate[i] === '!' || candidate[i] === '?') &&
+        isUnambiguousSentenceEnd(candidate, i) && i > best) {
+      best = i
+      break
+    }
   }
-  // Only cut if we find a boundary at least halfway through the window.
-  return best > max * 0.5 ? text.slice(0, best).trim() : candidate.trim()
+  if (best >= 0) return candidate.slice(0, best + 1).trim()
+  // Fallback: trim to last word boundary + ellipsis
+  const lastSpace = candidate.lastIndexOf(' ')
+  if (lastSpace > 0) return candidate.slice(0, lastSpace).trim() + '\u2026'
+  return candidate.trim() + '\u2026'
+}
+
+function trimIncompleteSentence(text: string): string {
+  // TIER 1: Reply ends with sentence-ending punctuation — return as-is
+  if (/[.!?]["'\u2019\u201D]?\s*$/.test(text)) return text
+
+  // TIER 2: Token-truncated. Find last unambiguous sentence boundary.
+  let best = -1
+  for (let i = text.length - 1; i >= 0; i--) {
+    if (text[i] === '.' || text[i] === '!' || text[i] === '?') {
+      if (isUnambiguousSentenceEnd(text, i)) {
+        best = i
+        break
+      }
+    }
+  }
+
+  // If an unambiguous boundary exists anywhere, trim there (no floor)
+  if (best >= 0) return text.slice(0, best + 1).trim()
+
+  // No sentence boundary at all: trim to last word boundary + ellipsis
+  const lastSpace = text.lastIndexOf(' ')
+  if (lastSpace > 0) return text.slice(0, lastSpace).trim() + '\u2026'
+  return text.trim() + '\u2026'
 }
 
 function sanitizeReply(text: string): string {
-  return trimAtSentenceBoundary(stripMarkdownFences(text))
+  const stripped = stripMarkdownFences(text)
+  const charLimited = trimToCharLimit(stripped)
+  return trimIncompleteSentence(charLimited)
 }
 
 // ── Claude API call ────────────────────────────────────────────
@@ -135,7 +202,7 @@ function sanitizeReply(text: string): string {
 async function callClaude(
   agentName: string,
   mode: ReplyMode,
-  context?: { postHeadline: string; postBody: string; userComment: string; isFinalReply?: boolean },
+  context?: { postHeadline: string; postBody: string; userComment: string; threadContext?: string; isFinalReply?: boolean },
 ): Promise<{ text: string; costCents: number }> {
   const personality = AGENT_PERSONALITIES[agentName]
   if (!personality) throw new Error(`No personality for agent: ${agentName}`)
@@ -157,9 +224,14 @@ async function callClaude(
       `POST HEADLINE: ${context!.postHeadline}`,
       '',
       `POST BODY: ${context!.postBody}`,
-      '',
-      `USER COMMENT: ${context!.userComment}`,
     ]
+    if (context!.threadContext) {
+      parts.push('', context!.threadContext)
+    }
+    parts.push(
+      '',
+      `USER COMMENT (respond to this): ${context!.userComment}`,
+    )
     if (context!.isFinalReply) {
       parts.push(
         '',
@@ -323,6 +395,60 @@ async function countUserAgentRepliesLast24h(userId: string): Promise<number> {
     .in('parent_reply_id', ids)
 
   return count ?? 0
+}
+
+// ── Conversation thread fetch ─────────────────────────────────
+// Fetches the thread under a top-level comment: the comment itself
+// plus all its direct siblings (replies with parent_reply_id pointing
+// to it). Returns chronological order, capped at the last 8 messages.
+// Uses the existing idx_replies_parent_reply_id index.
+
+interface ThreadMessage {
+  content:      string
+  isAgentReply: boolean
+  userId:       string
+  createdAt:    string
+}
+
+async function fetchThreadMessages(topLevelParentId: string): Promise<ThreadMessage[]> {
+  // Fetch the top-level comment itself + all siblings underneath it
+  const { data, error } = await getSupabaseAdmin()
+    .from('replies')
+    .select('content, is_agent_reply, user_id, created_at')
+    .or(`id.eq.${topLevelParentId},parent_reply_id.eq.${topLevelParentId}`)
+    .order('created_at', { ascending: true })
+
+  if (error || !data) return []
+
+  const messages: ThreadMessage[] = data.map(row => ({
+    content:      row.content,
+    isAgentReply: row.is_agent_reply,
+    userId:       row.user_id,
+    createdAt:    row.created_at,
+  }))
+
+  // Cap at last 8 messages (keep most recent including the triggering one)
+  if (messages.length > 8) {
+    return messages.slice(-8)
+  }
+  return messages
+}
+
+function formatThreadForPrompt(messages: ThreadMessage[], agentName: string): string {
+  if (messages.length <= 1) return ''  // Only the triggering message — no thread context needed
+
+  const agentProfileId = AGENT_PROFILE_IDS[agentName]
+  const lines = messages.slice(0, -1).map(msg => {
+    if (msg.isAgentReply && msg.userId === agentProfileId) {
+      return `[${agentName.charAt(0).toUpperCase() + agentName.slice(1)}]: ${msg.content}`
+    } else if (msg.isAgentReply) {
+      return `[Agent]: ${msg.content}`
+    } else {
+      return `[User]: ${msg.content}`
+    }
+  })
+
+  return 'CONVERSATION THREAD (previous messages, oldest first):\n' + lines.join('\n')
 }
 
 // ── Handler ────────────────────────────────────────────────────
@@ -509,6 +635,10 @@ export default async function handler(req: any, res: any) {
     }
 
     // ── 12c. Normal reply ──────────────────────────────────────
+    // Fetch conversation thread for context (last 8 messages, chronological)
+    const threadMessages = await fetchThreadMessages(topLevelParentId)
+    const threadContext = formatThreadForPrompt(threadMessages, taggedAgent!)
+
     // isFinalAllowedReply: userCount is currently 4, meaning THIS reply is the
     // 5th (allowed). The 6th would be a cap hit, so we prompt a natural close.
     const isFinalAllowedReply = userCount === AGENT_REPLIES_PER_USER_PER_POST_LIMIT - 1
@@ -516,6 +646,7 @@ export default async function handler(req: any, res: any) {
       postHeadline:  postHeadline!,
       postBody:      postBody!,
       userComment:   userReplyContent!,
+      threadContext: threadContext || undefined,
       isFinalReply:  isFinalAllowedReply,
     })
     const row = await insertAgentReply({
