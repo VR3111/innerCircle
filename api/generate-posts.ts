@@ -1,14 +1,12 @@
 import { AGENT_PERSONALITIES, type AgentPersonality } from './_agents/personalities'
 import { AGENT_NAMES }           from './_agents/constants'
-import { fetchTopHeadlines }     from './_lib/newsapi'
-import { generatePost }          from './_lib/claude'
+import { generatePost, type PostCandidate } from './_lib/claude'
 import { fetchImage }            from './_lib/unsplash'
 import { getSupabaseAdmin }      from './_lib/supabase-admin'
 import { computeCostCents }      from './_lib/call-claude'
 import { incrementTodaySpendCents } from './_lib/daily-spend'
 
 // Tell Vercel to use Node.js runtime and allow up to 60s (Hobby plan max).
-// Without maxDuration the default is 10s — not enough for 6 sequential agents.
 export const config = { maxDuration: 60 }
 
 const ALL_AGENTS = AGENT_NAMES.map(name => AGENT_PERSONALITIES[name])
@@ -35,6 +33,47 @@ async function hasRecentPost(agentId: string): Promise<boolean> {
   return (data?.length ?? 0) > 0
 }
 
+// Fetch last 20 headlines for dedup memory
+async function fetchRecentHeadlines(agentId: string): Promise<string[]> {
+  const { data } = await getSupabaseAdmin()
+    .from('posts')
+    .select('headline')
+    .eq('agent_id', agentId)
+    .order('created_at', { ascending: false })
+    .limit(20)
+  return (data ?? []).map(row => row.headline).filter((h): h is string => !!h)
+}
+
+// Log candidates to post_candidates table
+async function logCandidates(
+  agentId: string,
+  windowAt: string,
+  candidates: PostCandidate[],
+  selectedIndex: number | null,
+  selectionReasoning: string,
+  postId: string | null,
+): Promise<void> {
+  const rows = candidates.map((c, i) => ({
+    agent_id:             agentId,
+    window_at:            windowAt,
+    candidate_title:      c.title,
+    candidate_summary:    c.summary || null,
+    candidate_source_url: c.source_url || null,
+    importance_score:     c.importance_score || null,
+    was_selected:         i === selectedIndex,
+    selection_reasoning:  i === selectedIndex ? selectionReasoning : null,
+    post_id:              i === selectedIndex ? postId : null,
+  }))
+
+  const { error } = await getSupabaseAdmin()
+    .from('post_candidates')
+    .insert(rows)
+
+  if (error) {
+    console.error(`[generate-posts] Failed to log candidates for ${agentId}:`, error.message)
+  }
+}
+
 async function runAgent(personality: AgentPersonality): Promise<AgentResult> {
   try {
     // 1. Deduplication guard
@@ -43,43 +82,60 @@ async function runAgent(personality: AgentPersonality): Promise<AgentResult> {
       return { agent: personality.id, status: 'skipped', reason: `Posted within last ${MIN_HOURS_BETWEEN_POSTS}h` }
     }
 
-    // 2. Fetch news headlines
-    const articles = await fetchTopHeadlines(personality.newsQuery)
-    if (articles.length === 0) {
-      return { agent: personality.id, status: 'error', reason: 'No news articles returned' }
-    }
+    // 2. Fetch recent headlines for dedup memory
+    const recentHeadlines = await fetchRecentHeadlines(personality.id)
 
-    // 3. Generate post with Claude
-    const { headline, body, usage } = await generatePost(personality, articles)
+    // 3. Generate post with Claude (web_search enabled)
+    const result = await generatePost(personality, recentHeadlines)
 
     // 4. Track cost in daily_spend
-    const costCents = computeCostCents(usage)
+    const costCents = computeCostCents(result.usage)
     await incrementTodaySpendCents(costCents)
 
-    // 5. Fetch image from Unsplash (non-fatal if it fails)
+    const windowAt = new Date().toISOString()
+
+    // 5. Handle refuse-to-post path
+    if (result.selectedIndex === null || result.post === null) {
+      await logCandidates(personality.id, windowAt, result.candidates, null, result.selectionReasoning, null)
+      return { agent: personality.id, status: 'skipped', reason: `No post: ${result.selectionReasoning}` }
+    }
+
+    // 6. Fetch image from Unsplash (non-fatal if it fails)
     const imageUrl = await fetchImage(personality.imageKeywords)
 
-    // 6. Insert post into Supabase
+    // 7. Insert post into Supabase
     const { data, error } = await getSupabaseAdmin()
       .from('posts')
       .insert({
         agent_id:  personality.id,
-        headline,
-        body,
+        headline:  result.post.headline,
+        body:      result.post.body,
         image_url: imageUrl,
       })
       .select('id')
       .single()
 
     if (error) {
+      // Defensive: catch a Postgres unique-violation (23505) on the posts INSERT.
+      // No unique constraint on (agent_id, time) exists yet — the concurrency
+      // index is deferred until post-seed-cleanup (see migration 017 note).
+      // This block is pre-positioned for when that index returns. Until then
+      // it is effectively unreachable; the active dedup guard is hasRecentPost().
+      if (error.code === '23505') {
+        await logCandidates(personality.id, windowAt, result.candidates, result.selectedIndex, result.selectionReasoning, null)
+        return { agent: personality.id, status: 'skipped', reason: 'Concurrent duplicate prevented by hour-bucket constraint' }
+      }
       return { agent: personality.id, status: 'error', reason: `DB insert failed: ${error.message}` }
     }
+
+    // 8. Log candidates with winning post_id
+    await logCandidates(personality.id, windowAt, result.candidates, result.selectedIndex, result.selectionReasoning, data.id)
 
     return {
       agent:    personality.id,
       status:   'posted',
       postId:   data.id,
-      headline,
+      headline: result.post.headline,
     }
   } catch (err: any) {
     const reason = err?.message ?? String(err)
@@ -117,7 +173,6 @@ export default async function handler(req: any, res: any) {
       'VITE_SUPABASE_URL',
       'SUPABASE_SERVICE_ROLE_KEY',
       'ANTHROPIC_API_KEY',
-      'NEWS_API_KEY',
     ].filter(k => !process.env[k])
 
     if (missingVars.length > 0) {
@@ -131,14 +186,20 @@ export default async function handler(req: any, res: any) {
     }
 
     const startedAt = Date.now()
-    const results: AgentResult[] = []
 
-    // Run agents sequentially so external API rate limits are respected
-    for (const agent of ALL_AGENTS) {
-      const result = await runAgent(agent)
-      results.push(result)
+    // Run agents in parallel — web_search is Anthropic-hosted (server-side),
+    // no external rate limit to respect on our side. 6 concurrent requests
+    // is well within Anthropic API limits.
+    const settled = await Promise.allSettled(ALL_AGENTS.map(runAgent))
+
+    const results: AgentResult[] = settled.map((outcome, i) => {
+      if (outcome.status === 'fulfilled') return outcome.value
+      return { agent: ALL_AGENTS[i].id, status: 'error' as const, reason: outcome.reason?.message ?? String(outcome.reason) }
+    })
+
+    for (const result of results) {
       console.log(
-        `[generate-posts] ${agent.id}: ${result.status}` +
+        `[generate-posts] ${result.agent}: ${result.status}` +
         (result.reason   ? ` — ${result.reason}`   : '') +
         (result.headline ? ` — "${result.headline}"` : '')
       )
