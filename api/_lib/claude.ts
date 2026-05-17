@@ -20,6 +20,7 @@ export interface PostGenerationResult {
   selectedIndex:       number | null
   selectionReasoning:  string
   post:                GeneratedPost | null
+  imageQuery:          string | null
   usage:              ClaudeUsage
 }
 
@@ -30,6 +31,7 @@ interface ClaudePostResponse {
   selected_index:       number | null
   selection_reasoning:  string
   post:                 { headline: string; body: string } | null
+  image_query?:         string | null
 }
 
 // ── JSON extraction ──────────────────────────────────────────
@@ -164,6 +166,7 @@ export async function generatePost(
       headline: parsed.post.headline.trim(),
       body:     parsed.post.body.trim(),
     } : null,
+    imageQuery:         (typeof parsed.image_query === 'string' && parsed.image_query.trim()) ? parsed.image_query.trim() : null,
     usage: response.usage,
   }
 }

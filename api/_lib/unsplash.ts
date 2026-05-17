@@ -1,11 +1,15 @@
 // Fetches a random relevant image from Unsplash for a set of keywords.
 // Returns the "regular" size URL (~1080px wide) or null if unavailable.
-export async function fetchImage(keywords: string[]): Promise<string | null> {
+// If imageQuery is provided (Claude-generated, content-aware), use it directly.
+// Otherwise fall back to random selection from the static keywords array.
+export async function fetchImage(keywords: string[], imageQuery?: string | null): Promise<string | null> {
   const key = process.env.UNSPLASH_ACCESS_KEY
   if (!key) return null
 
-  // Rotate through the keyword list to get variety across runs
-  const query = keywords[Math.floor(Math.random() * Math.min(3, keywords.length))]
+  // Prefer Claude's content-aware query; fall back to random static keyword
+  const query = (imageQuery && imageQuery.trim())
+    ? imageQuery.trim()
+    : keywords[Math.floor(Math.random() * Math.min(3, keywords.length))]
 
   const url = new URL('https://api.unsplash.com/search/photos')
   url.searchParams.set('query', query)

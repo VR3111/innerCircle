@@ -105,7 +105,8 @@ async function runAgent(personality: AgentPersonality, force: boolean): Promise<
     }
 
     // 6. Fetch image from Unsplash (non-fatal if it fails)
-    const imageUrl = await fetchImage(personality.imageKeywords)
+    //    Prefer Claude's content-aware image_query; fall back to static keywords
+    const imageUrl = await fetchImage(personality.imageKeywords, result.imageQuery)
 
     // 7. Insert post into Supabase
     const { data, error } = await getSupabaseAdmin()

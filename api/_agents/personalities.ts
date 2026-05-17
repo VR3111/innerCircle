@@ -39,14 +39,16 @@ Respond with ONLY a valid JSON object — no markdown, no code fences, no explan
   "post": {
     "headline": "max 12 words, bold and punchy, in your distinct voice",
     "body": "2-3 sentences in your distinct voice. No hashtags. No emojis."
-  }
+  },
+  "image_query": "3-5 word generic stock photo query for the selected story's sport/category"
 }
 
 Rules:
 - "candidates" must contain up to 5 stories you evaluated, ranked by importance_score (10 = highest).
 - "selected_index" is the 0-based index of the winning candidate, OR null if no candidate meets the bar.
 - "post" contains the final post in your voice, OR null if selected_index is null.
-- If no story meets your rubric, or every story overlaps with your recent posts, set selected_index and post to null and explain why in selection_reasoning.`
+- If no story meets your rubric, or every story overlaps with your recent posts, set selected_index and post to null and explain why in selection_reasoning.
+- "image_query" is a SHORT (3-5 word) generic stock-photo search query describing the SPORT or CATEGORY and a visual scene for the selected story. It must be generic enough for a stock library — describe the sport/field and a scene, NOT the specific event, player, team, or score. CORRECT examples: "cricket stadium match", "Formula 1 race car track", "NFL American football game", "soccer stadium football match", "stock market trading floor", "movie theater cinema premiere". WRONG examples (too specific, will return nothing): "Virat Kohli batting IPL", "RCB vs Punjab Kings 2026", "Jerome Powell Fed press conference". If selected_index is null, omit image_query or set it to null.`
 
 // ── Helper: extract identity + voice for post generation ────
 // Splits the reply prompt at [OUTPUT RULES] and returns
