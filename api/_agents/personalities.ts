@@ -127,11 +127,15 @@ Rule: Every cap-hit message must be freshly written.`,
     name: 'Blitz',
     domain: 'cricket (including IPL), football/soccer, NFL, NBA, F1, and tennis Grand Slams',
     sourceWhitelist: ['ESPN', 'ESPN Cricinfo', 'Cricbuzz', 'BBC Sport', 'The Athletic', 'Sky Sports', 'Reuters Sports', 'AP Sports', 'official league sites'],
-    topNewsRubric: `- Must be a completed result, confirmed transfer, major injury report, or official league announcement
-- Tier-1 sports only: Cricket (including IPL, international tests, World Cup), Football/Soccer (Premier League, La Liga, Champions League, international), NFL, NBA, F1, Tennis Grand Slams
-- Do NOT cover previews, predictions, pre-match analysis, college sports, niche sports, or exhibition games
-- Prefer upset results, record-breaking performances, and confirmed blockbuster transfers over routine wins
-- If multiple results landed today, pick the one with the biggest audience or competitive stakes`,
+    topNewsRubric: `- Must be a completed result, confirmed transfer, major injury report, or official league announcement — no previews, predictions, pre-match analysis, college sports, niche sports, or exhibition games
+- SPORT PRIORITY — strict two-tier model:
+  - TIER 1 (co-equal, no internal ranking): Cricket, Football/Soccer, NFL, F1
+  - TIER 2 (everything else in domain): NBA, Tennis Grand Slams, all others
+- SIGNIFICANCE DEFINITION — a Tier 1 story is "significant" if it is ANY of: a final, knockout, playoff, or season-decider; an upset or record-breaking result; a confirmed blockbuster transfer or major injury; OR a live event in a major active competition (IPL, a top football league or Champions League, the NFL regular season or playoffs, an F1 race weekend) even if it is a routine fixture. A live IPL match during IPL season, or an F1 race result during the season, is significant by default. Only genuinely meaningless events (dead rubbers with nothing at stake, pre-season/friendlies, practice sessions) are NOT significant.
+- SELECTION RULE (hard): selected_index MUST point to a significant Tier 1 story whenever at least one exists in the candidate set — even if a Tier 2 story seems individually bigger or more dramatic. A Tier 2 story may only be selected when NO significant Tier 1 story is present in this window.
+- SCORING: significant Tier 1 stories score 9-10. Tier 2 stories score 9-10 ONLY in windows with no significant Tier 1 story; otherwise cap Tier 2 at 7.
+- Among Tier 1 sports there is no hierarchy — when multiple significant Tier 1 stories exist, pick the one with the highest within-sport stakes (final > playoff/decider > key league or race result > routine fixture) and biggest audience. Among Tier 2 (only when Tier 1 absent), the same significance logic applies.
+- Prefer upsets, records, and blockbuster transfers over routine wins, within whichever tier is being selected from.`,
     imageKeywords: ['sports', 'basketball', 'football', 'athlete', 'stadium'],
     postGenerationRules: POST_GENERATION_OUTPUT_FORMAT,
     replySystemPrompt: `[IDENTITY]
