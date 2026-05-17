@@ -93,34 +93,39 @@ export async function generatePost(
   const identityAndVoice = getIdentityAndVoice(personality)
 
   // Build system prompt sections
+  const todayISO = new Date().toISOString().slice(0, 10)
+
   const sections: string[] = [
     // 1. Identity and voice
     identityAndVoice,
 
-    // 2. Domain scope
+    // 2. Date context (recency anchor)
+    `[DATE CONTEXT]\nToday's date is ${todayISO}. The story you select MUST be a development that occurred or was announced within the last 72 hours of this date. Strongly prefer stories from the last 24 hours; 72 hours is the absolute ceiling. Any story older than 72 hours is INELIGIBLE regardless of how significant it is. A significant old story is still old news — do not present it as current.`,
+
+    // 3. Domain scope
     `[DOMAIN]\nYou cover ${personality.domain}. You do NOT cover topics outside this domain.`,
 
-    // 3. Source whitelist
+    // 4. Source whitelist
     `[SOURCE WHITELIST]\nWhen searching for news, only consider sources from this whitelist: ${personality.sourceWhitelist.join(', ')}. If a story's primary coverage is outside this whitelist, do not select it.`,
 
-    // 4. Top news rubric
+    // 5. Top news rubric
     `[TOP NEWS CRITERIA]\n${personality.topNewsRubric}`,
 
-    // 5. Recent-post memory
+    // 6. Recent-post memory
     buildRecentPostsSection(recentHeadlines),
 
-    // 6. Output format (from personality.postGenerationRules)
+    // 7. Output format (from personality.postGenerationRules)
     `[OUTPUT FORMAT]\n${personality.postGenerationRules}`,
 
-    // 7. Refuse-to-post path
-    `[REFUSE-TO-POST]\nIf no story you find meets the criteria above, OR if every story meaningfully overlaps with the recent posts listed above, return null for selected_index and post, and explain why in selection_reasoning. Do not force a post.`,
+    // 8. Refuse-to-post path
+    `[REFUSE-TO-POST]\nIf no story you find meets the criteria above, OR if every story meaningfully overlaps with the recent posts listed above, OR if web_search only surfaces stories older than 72 hours from today (${todayISO}), OR if you cannot positively confirm a story's date falls within the last 72 hours — return null for selected_index and post, and explain why in selection_reasoning. Do not force a post. Refusing to post on a quiet news day is the correct and expected behavior, not a failure. An empty window is fine. Posting old news as current is a serious error. When uncertain about a story's recency, refuse rather than risk it.`,
   ]
 
   const systemPrompt = sections.join('\n\n')
 
   const response = await callClaudeAPI({
     systemPrompt,
-    userMessage: `Find the most important ${personality.domain} news from the last 24 hours and write a post about it following your instructions.`,
+    userMessage: `Find the most important ${personality.domain} news from the last 24 hours (today is ${todayISO}) and write a post about it following your instructions. If nothing significant happened in the last 24 hours, you may go back up to 72 hours. If nothing eligible exists within 72 hours, refuse to post.`,
     maxTokens:   2048,
     tools:       [{ type: 'web_search_20250305', name: 'web_search' }],
   })
